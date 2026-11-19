@@ -335,14 +335,14 @@ export class Game {
     /* QTE เกาะขอบสนามเมื่อกำลังจะตกแมพ! */
     if (f.ledge && !f.ko && !this.cutscene) {
       const L = f.ledge;
-      L.t += dt; L.tug = Math.max(0, (L.tug || 0) - dt);
+      L.t += dt; L.tug = Math.max(0, (L.tug || 0) - dt); L.shield = Math.max(0, (L.shield || 0) - dt);
       f.vx = 0; f.vy = 0; f.x = L.x + L.side * 12; f.y = GROUND + 46 - (L.progress / L.need) * 14; f.face = -L.side;
       if (can && (inp.jump || inp.punch || inp.kick)) {
         L.progress++; L.tug = 0.14; this.sfx.qte();
         this.spark(L.x, GROUND + 4, 6, '#ffd24a', 180, 0.25, 4, 220);
       }
       if (L.progress >= L.need) {
-        const side = L.side, ex = L.x; f.ledge = null; f.y = GROUND; f.x = ex - side * 50; f.vy = -310; f.vx = -side * 170; f.inv = 0.65; f.grounded = false;
+        const side = L.side, ex = L.x; f.ledge = null; f.y = GROUND; f.x = ex - side * 50; f.vy = -310; f.vx = -side * 170; f.inv = 0.9; f.grounded = false;
         this.sfx.saved(); this.ring(f.x, GROUND - 40, 110, '#7dff6b');
         this.texts.push({ txt: 'SAVED!', x: f.x, y: GROUND - 150, t: 0.75, max: 0.75, color: '#7dff6b', size: 32 });
       } else if (L.t >= L.dur) {
@@ -452,7 +452,7 @@ export class Game {
       const nearR = Math.abs(f.x - STAGE_R) < 46 && f.x >= STAGE_R - 16;
       if (nearL || nearR) {
         const side = nearL ? -1 : 1, edgeX = nearL ? STAGE_L : STAGE_R;
-        f.ledge = { side, x: edgeX, t: 0, dur: 2.3, progress: 0, need: 6, tug: 0 };
+        f.ledge = { side, x: edgeX, t: 0, dur: 2.3, progress: 0, need: 6, tug: 0, shield: 1.4 };
         f.vx = 0; f.vy = 0; f.stun = 0; f.ragdollT = 0; f.x = edgeX + side * 12; f.y = GROUND + 46;
         this.sfx.ledge(); this.spark(edgeX, GROUND, 10, '#fff', 180, 0.3, 4, 200);
       }
@@ -903,7 +903,16 @@ export class Game {
   hit(att, def, o) {
     if (def.inv > 0 || def.ko) return undefined;
     const dir = def.x >= att.x ? 1 : -1, hx = def.x, hy = def.y - 80;
-    if (def.ledge) { def.ledge = null; def.ledgeCd = 2.5; }
+    if (def.ledge) {
+      if ((def.ledge.shield || 0) > 0) {
+        this.spark(hx, hy, 12, '#4fc3f7', 240, 0.3, 4);
+        this.ring(def.x, def.y - 50, 95, '#4fc3f7');
+        this.sfx.block();
+        this.texts.push({ txt: 'SHIELD!', x: def.x, y: def.y - 125, t: 0.55, max: 0.55, color: '#4fc3f7', size: 26 });
+        return false;
+      }
+      def.ledge = null; def.ledgeCd = 2.5;
+    }
     if (def.parryT > 0) {
       def.parryT = 0; def.parryCd = 0.12; def.inv = 0.35; def.flash = 0.12; def.ce = Math.min(100, def.ce + 16);
       att.act = null; att.stun = Math.max(att.stun, 1.35); att.vx = -dir * 260; att.vy = Math.min(att.vy, -120); att.flash = 0.18; att.inv = 0;
@@ -1125,12 +1134,16 @@ export class Game {
     const c = this.c, L = f.ledge, x = clamp(L.x + L.side * 10, 95, W - 95), y = GROUND - 58;
     const rem = clamp(1 - L.t / L.dur, 0, 1), prog = clamp(L.progress / L.need, 0, 1);
     c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = 'rgba(0,0,0,0.82)'; c.fillRect(x - 86, y - 34, 172, 54);
-    c.strokeStyle = '#ffd24a'; c.lineWidth = 2; c.strokeRect(x - 86, y - 34, 172, 54);
-    c.font = `13px ${FONT}`; c.fillStyle = '#ffd24a'; c.fillText(`MASH JUMP/PUNCH! (${L.progress}/${L.need})`, x, y - 16);
-    c.fillStyle = '#222'; c.fillRect(x - 74, y - 2, 148, 10);
-    c.fillStyle = '#7dff6b'; c.fillRect(x - 74, y - 2, 148 * prog, 10);
-    c.fillStyle = '#ff5252'; c.fillRect(x - 74, y + 11, 148 * rem, 4);
+    c.fillStyle = 'rgba(0,0,0,0.82)'; c.fillRect(x - 92, y - 36, 184, 58);
+    c.strokeStyle = (L.shield || 0) > 0 ? '#4fc3f7' : '#ffd24a'; c.lineWidth = 2; c.strokeRect(x - 92, y - 36, 184, 58);
+    c.font = `13px ${FONT}`; c.fillStyle = '#ffd24a'; c.fillText(`MASH JUMP/PUNCH! (${L.progress}/${L.need})`, x, y - 18);
+    c.fillStyle = '#222'; c.fillRect(x - 76, y - 4, 152, 9);
+    c.fillStyle = '#7dff6b'; c.fillRect(x - 76, y - 4, 152 * prog, 9);
+    c.fillStyle = '#ff5252'; c.fillRect(x - 76, y + 8, 152 * rem, 4);
+    if ((L.shield || 0) > 0) {
+      c.font = `10px ${FONT}`; c.fillStyle = '#4fc3f7';
+      c.fillText(`SHIELD ${L.shield.toFixed(1)}s`, x, y + 17);
+    }
     c.restore();
   }
   drawOrb(x, y, r, col) { const c = this.c, g = c.createRadialGradient(x, y, 1, x, y, r); g.addColorStop(0, '#fff'); g.addColorStop(0.35, col); g.addColorStop(1, col + '00'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
@@ -1279,6 +1292,10 @@ export class Game {
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(f.x, f.floorY + 4, 30 * k, 7 * k, 0, 0, 7); c.fill();
     }
     this.drawRig(f.rig, col, f.inv > 0 && f.flash <= 0 && f.act?.name !== 'domain' ? 0.65 : 1, f.face, f.ko, f.gear);
+    if (f.ledge && (f.ledge.shield || 0) > 0) {
+      c.save(); c.strokeStyle = '#4fc3f7'; c.fillStyle = 'rgba(79, 195, 247, 0.16)'; c.shadowColor = '#4fc3f7'; c.shadowBlur = 18;
+      c.lineWidth = 3; c.beginPath(); c.arc(f.x, f.y - 36, 48, 0, 7); c.fill(); c.stroke(); c.restore();
+    }
     if (f.parryT > 0) {
       c.save(); c.strokeStyle = '#ffd24a'; c.shadowColor = '#ffd24a'; c.shadowBlur = 22; c.lineWidth = 5; c.globalAlpha = 0.85;
       c.beginPath(); c.arc(f.x + f.face * 16, f.y - 72, 48, f.face > 0 ? -1.1 : Math.PI - 1.1, f.face > 0 ? 1.1 : Math.PI + 1.1); c.stroke();
