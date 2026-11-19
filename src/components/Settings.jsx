@@ -5,8 +5,8 @@ import { sfx } from '../game/audio.js';
 
 const PROFILES = [
   ['1v1', '1v1 (มาตรฐาน)', 'ใช้สำหรับเล่นโหมด 1 vs 1 ทั้งออฟไลน์และออนไลน์'],
-  ['2v2_offline', '2v2 Offline (เครื่องเดียว)', 'ชุดปุ่มแยกสำหรับโหมด 2 vs 2 บนเครื่องเดียว (P1 & P2)'],
-  ['2v2_online', '2v2 Online (ออนไลน์)', 'ชุดปุ่มแยกเฉพาะตัวเราเมื่อเล่นโหมด 2 vs 2 ออนไลน์ (ทั้ง Host และ Guest)'],
+  ['2v2_offline', '2v2 Offline (เครื่องเดียว)', 'ตั้งปุ่มแยกสำหรับ P1, P2, P3, P4 ในโหมด 2v2 บนเครื่องเดียว'],
+  ['2v2_online', '2v2 Online (ออนไลน์)', 'ชุดปุ่มแยกเฉพาะตัวเราเมื่อเล่นโหมด 2 vs 2 ออนไลน์ (ใช้ได้ทุกช่อง P1–P4)'],
 ];
 
 export default function Settings({ onBack, initialProfile = '1v1' }) {
@@ -51,7 +51,7 @@ export default function Settings({ onBack, initialProfile = '1v1' }) {
     setWait(null); setNote('คัดลอกปุ่มจากโหมด 1v1 มาแล้ว!'); sfx.click();
   };
 
-  const slots = isOnlineProf ? [0] : [0, 1];
+  const slots = isOnlineProf ? [0] : prof === '2v2_offline' ? [0, 1, 2, 3] : [0, 1];
   const profInfo = PROFILES.find(([id]) => id === prof) || PROFILES[0];
 
   return (

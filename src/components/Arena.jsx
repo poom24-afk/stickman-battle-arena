@@ -14,13 +14,16 @@ export default function Arena({ cfg, onEnd, onExit, online }) {
       onEnd,
       onPause: setPaused,
       net: online?.net || null,
+      mySlot: online?.mySlot ?? 0,
+      occupied: online?.occupied || null,
       onPeerLeft: online?.onPeerLeft,
     });
     game.current = g; g.start();
     return () => g.destroy();
   }, []); // eslint-disable-line
   const key = (code, v) => game.current && game.current.setKey(code, v);
-  const pads = online ? [0] : [0, 1];
+  const pads = online ? [0] : cfg.mode === '2v2' ? [0, 1] : [0, 1];
+  const padCol = (p) => cfg.colors[online ? (online.mySlot ?? (online.role === 'guest' ? 1 : 0)) : p];
   return (
     <div className="arena">
       <div className="stage">
@@ -28,7 +31,7 @@ export default function Arena({ cfg, onEnd, onExit, online }) {
         <button className="pause-btn" onClick={() => game.current.setPaused(true)}>❚❚</button>
         {online && (
           <div className="arena-net">
-            ONLINE · {online.role === 'host' ? 'P1 (HOST)' : 'P2 (GUEST)'} · ROOM {online.code}
+            ONLINE · P{(online.mySlot ?? 0) + 1} ({online.role === 'host' ? 'HOST' : 'GUEST'}) · ROOM {online.code}
             {online.pingMs !== null ? ` · ${online.pingMs}ms` : ''}
           </div>
         )}
@@ -42,7 +45,7 @@ export default function Arena({ cfg, onEnd, onExit, online }) {
       </div>
       <div className="touch">
         {pads.map((p) => (
-          <div className="pad" key={p} style={{ '--c': cfg.colors[online?.role === 'guest' ? 1 : p] }}>
+          <div className="pad" key={p} style={{ '--c': padCol(p) }}>
             {BTN.map(([label, name]) => {
               const code = ctl[p][name][0];
               return (

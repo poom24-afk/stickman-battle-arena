@@ -14,6 +14,10 @@ function safeSend(ws, obj) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
 }
 
+function getOccupied(room) {
+  return [true, room.guests.has(1), room.guests.has(2), room.guests.has(3)];
+}
+
 export function attachWsServer(httpServer) {
   const wss = new WebSocketServer({ noServer: true });
   const rooms = new Map();
@@ -28,6 +32,7 @@ export function attachWsServer(httpServer) {
 
   wss.on('connection', (ws) => {
     ws.role = null;
+    ws.slot = null;
     ws.roomCode = null;
 
     const leaveRoom = () => {
@@ -35,15 +40,18 @@ export function attachWsServer(httpServer) {
       if (!code || !rooms.has(code)) return;
       const room = rooms.get(code);
       if (ws.role === 'host') {
-        safeSend(room.guest, { type: 'peer-left', reason: 'หัวหน้าห้องออกจากห้องแล้ว' });
-        if (room.guest) { room.guest.roomCode = null; room.guest.role = null; }
+        room.guests.forEach((g) => {
+          safeSend(g, { type: 'peer-left', slot: 0, reason: 'หัวหน้าห้องออกจากห้องแล้ว' });
+          g.roomCode = null; g.role = null; g.slot = null;
+        });
         rooms.delete(code);
-      } else if (ws.role === 'guest' && room.guest === ws) {
-        room.guest = null;
-        safeSend(room.host, { type: 'peer-left', reason: 'ผู้เล่น 2 ออกจากห้องแล้ว' });
+      } else if (ws.role === 'guest' && room.guests.get(ws.slot) === ws) {
+        room.guests.delete(ws.slot);
+        safeSend(room.host, { type: 'peer-left', slot: ws.slot, occupied: getOccupied(room), reason: `ผู้เล่น P${ws.slot + 1} ออกจากห้องแล้ว` });
       }
       ws.roomCode = null;
       ws.role = null;
+      ws.slot = null;
     };
 
     ws.on('message', (raw) => {
@@ -59,10 +67,11 @@ export function attachWsServer(httpServer) {
       if (msg.type === 'create') {
         leaveRoom();
         const code = makeCode(rooms);
-        rooms.set(code, { host: ws, guest: null, cfg: msg.cfg || null });
+        rooms.set(code, { host: ws, guests: new Map(), cfg: msg.cfg || null });
         ws.role = 'host';
+        ws.slot = 0;
         ws.roomCode = code;
-        safeSend(ws, { type: 'created', code });
+        safeSend(ws, { type: 'created', code, slot: 0 });
         return;
       }
 
@@ -74,15 +83,20 @@ export function attachWsServer(httpServer) {
           safeSend(ws, { type: 'error', message: `ไม่พบห้อง "${code}"` });
           return;
         }
-        if (room.guest) {
-          safeSend(ws, { type: 'error', message: 'ห้องนี้เต็มแล้ว (2/2)' });
+        const candidates = room.cfg?.mode === '2v2' ? [1, 2, 3] : [1];
+        const freeSlot = candidates.find((s) => !room.guests.has(s));
+        if (!freeSlot) {
+          const cap = candidates.length + 1;
+          safeSend(ws, { type: 'error', message: `ห้องนี้เต็มแล้ว (${cap}/${cap})` });
           return;
         }
-        room.guest = ws;
+        room.guests.set(freeSlot, ws);
         ws.role = 'guest';
+        ws.slot = freeSlot;
         ws.roomCode = code;
-        safeSend(ws, { type: 'joined', code, cfg: room.cfg });
-        safeSend(room.host, { type: 'peer-joined' });
+        const occ = getOccupied(room);
+        safeSend(ws, { type: 'joined', code, slot: freeSlot, cfg: room.cfg, occupied: occ });
+        safeSend(room.host, { type: 'peer-joined', slot: freeSlot, occupied: occ });
         return;
       }
 
@@ -94,8 +108,11 @@ export function attachWsServer(httpServer) {
       const room = ws.roomCode && rooms.get(ws.roomCode);
       if (!room) return;
       if (msg.type === 'cfg-sync' && ws.role === 'host') room.cfg = msg.cfg;
-      const peer = ws.role === 'host' ? room.guest : room.host;
-      safeSend(peer, msg);
+      if (ws.role === 'host') {
+        room.guests.forEach((g) => safeSend(g, msg));
+      } else {
+        safeSend(room.host, { ...msg, slot: ws.slot });
+      }
     });
 
     ws.on('close', leaveRoom);

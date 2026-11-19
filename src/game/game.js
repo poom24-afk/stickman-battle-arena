@@ -78,10 +78,12 @@ export class Game {
     this.keys = new Set();
     this.net = cb.net || null;
     this.netRole = this.net?.role || null;
+    this.mySlot = cb.mySlot ?? (this.netRole === 'guest' ? 1 : 0);
     this.ctlProfile = controlProfileOf(cfg, !!this.net);
-    this.controls = loadControls(this.ctlProfile); this.hints = keyHints(this.controls);
-    if (this.netRole === 'guest') this.hints[1] = this.hints[0];
-    this.netEvents = []; this.remoteHeld = {}; this.remotePulse = {}; this.lastSync = 0; this.lastSentHeld = ''; this._lastShake = 0;
+    this.controls = loadControls(this.ctlProfile);
+    const rawHints = keyHints(this.controls);
+    this.hints = Array.from({ length: 4 }, (_, i) => (this.net ? rawHints[0] : (rawHints[i] || rawHints[0])));
+    this.netEvents = []; this.remoteHeld = [{}, {}, {}, {}]; this.remotePulse = [{}, {}, {}, {}]; this.lastSync = 0; this.lastSentHeld = ''; this._lastShake = 0;
     this.sfx = this.netRole === 'host'
       ? Object.fromEntries(Object.keys(rawSfx).map((k) => [k, () => { rawSfx[k](); this.netEvents.push(['sfx', k]); }]))
       : rawSfx;
@@ -98,17 +100,20 @@ export class Game {
         ch, pas: ch ? ch.pas : {}, name: ch ? ch.name : `PLAYER ${i + 1}`, jp: ch ? ch.jp : '', skin, gear: skin?.gear || null,
       };
     };
-    this.fighters = [
-      mkFighter(0, 0, cfg.chars?.[0], cfg.skins?.[0], cfg.loadouts[0], cfg.domains[0], cfg.colors[0], false, 'P1'),
-      mkFighter(1, 1, cfg.chars?.[1], cfg.skins?.[1], cfg.loadouts[1], cfg.domains[1], cfg.colors[1], !!cfg.p2Ai && !this.net, cfg.p2Ai && !this.net ? 'CPU' : 'P2'),
-    ];
-    if (this.is2v2) {
-      const a0 = cfg.allies?.[0] || 'yuji', a1 = cfg.allies?.[1] || 'mahito';
-      this.fighters.push(
-        mkFighter(2, 0, a0, 'default', CHARACTERS[a0]?.skills, CHARACTERS[a0]?.domain, CHARACTERS[a0]?.color, true, 'ALLY A'),
-        mkFighter(3, 1, a1, 'default', CHARACTERS[a1]?.skills, CHARACTERS[a1]?.domain, CHARACTERS[a1]?.color, true, 'ALLY B'),
-      );
-    }
+    const teams = cfg.teams || [0, 1, 0, 1];
+    const slotModes = cfg.slotModes || ['human', cfg.p2Ai ? 'bot' : 'human', 'bot', 'bot'];
+    const occ = cb.occupied || cfg.occupied || [true, false, false, false];
+    const count = this.is2v2 ? 4 : 2;
+    this.fighters = Array.from({ length: count }, (_, i) => {
+      const team = this.is2v2 ? (teams[i] ?? (i % 2)) : i;
+      const isBot = this.is2v2
+        ? (slotModes[i] === 'bot' || (!!this.net && i > 0 && !occ[i]))
+        : (i === 1 && !this.net && (!!cfg.p2Ai || slotModes[1] === 'bot'));
+      const tag = this.is2v2
+        ? (isBot ? `P${i + 1} BOT` : `P${i + 1}`)
+        : (isBot ? 'CPU' : `P${i + 1}`);
+      return mkFighter(i, team, cfg.chars?.[i], cfg.skins?.[i], cfg.loadouts?.[i], cfg.domains?.[i], cfg.colors?.[i], isBot, tag);
+    });
     this.prev = this.fighters.map(() => ({}));
     this.wins = [0, 0];
     this.cam = { x: this.worldW / 2, y: H / 2, z: this.is2v2 ? 0.62 : 1 };
@@ -135,14 +140,26 @@ export class Game {
     this.onVis = () => { if (document.hidden) { this.keys.clear(); if (!this.net) this.setPaused(true); else if (this.netRole === 'guest') this.sendGuestInput(); } };
     this.unsubNet = this.net ? this.net.onMessage((msg) => {
       if (this.netRole === 'host' && msg.type === 'input') {
-        this.remoteHeld = msg.held || {};
-        if (msg.pulse) for (const k in msg.pulse) if (msg.pulse[k]) this.remotePulse[k] = true;
+        const s = msg.slot ?? 1;
+        if (s >= 1 && s < 4) {
+          this.remoteHeld[s] = msg.held || {};
+          if (msg.pulse) for (const k in msg.pulse) if (msg.pulse[k]) this.remotePulse[s][k] = true;
+        }
       } else if (this.netRole === 'guest' && msg.type === 'state') {
         this.applySnapshot(msg);
       } else if (msg.type === 'pause') {
         if (!this.over) { this.paused = !!msg.v; this.keys.clear(); this.cb.onPause?.(this.paused); }
       } else if (msg.type === 'peer-left' || msg.type === 'closed') {
-        this.cb.onPeerLeft?.(msg.reason || 'คู่ต่อสู้หลุดการเชื่อมต่อ');
+        const s = msg.slot ?? 0;
+        const stillHumanGuest = this.netRole === 'host' && this.is2v2 && msg.type === 'peer-left' && s >= 1
+          && this.fighters.some((f, idx) => idx > 0 && idx !== s && !f.ai);
+        if (stillHumanGuest && this.fighters[s]) {
+          this.fighters[s].ai = true;
+          this.fighters[s].tag = `P${s + 1} BOT`;
+          this.texts.push({ txt: `P${s + 1} LEFT · BOT TAKEOVER`, x: this.fighters[s].x, y: this.fighters[s].y - 160, t: 1.6, max: 1.6, color: '#ffd24a', size: 22 });
+        } else {
+          this.cb.onPeerLeft?.(msg.reason || 'คู่ต่อสู้หลุดการเชื่อมต่อ');
+        }
       }
     }) : null;
   }
@@ -179,10 +196,14 @@ export class Game {
     removeEventListener('blur', this.clearKeys); document.removeEventListener('visibilitychange', this.onVis);
   }
   resetRound() {
-    const spawns = this.is2v2 ? [460, 1940, 290, 2110] : [380, 900];
+    const spA = this.is2v2 ? [480, 300, 190, 110] : [380, 280];
+    const spB = this.is2v2 ? [1920, 2100, 2210, 2290] : [900, 1000];
+    const tIdx = [0, 0];
     this.fighters.forEach((f) => {
+      const n = tIdx[f.team]++;
+      const sx = f.team === 0 ? (spA[n] ?? 480) : (spB[n] ?? 1920);
       Object.assign(f, {
-        x: spawns[f.i] ?? (f.team ? 900 : 380), y: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
+        x: sx, y: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
         parryT: 0, parryCd: 0, dropT: 0, dropCool: 0, climbing: false, floorY: GROUND, ragdollT: 0, ledge: null, ledgeCd: 0,
         aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1,
         cd: [0, 0, 0], amp: 0, ampMul: 1, ampSpd: 1, ce: f.ce > 0 && this.round > 1 ? Math.min(60, f.ce) : 0, combo: 0, comboT: 0, flash: 0, anim: 0, grounded: true, ghost: false, ko: false, rag: 0, aura: 0, auraC: '#fff',
@@ -236,7 +257,7 @@ export class Game {
       const d = Math.hypot(x.x - f.x, x.y - f.y);
       if (d < bd) { bd = d; best = x; }
     }
-    return best || this.fighters[1 - (f.i % 2)];
+    return best || this.fighters.find((x) => x.team !== f.team) || this.fighters[0];
   }
   domAbility(f) {
     const d = this.dom;
@@ -369,7 +390,7 @@ export class Game {
     const sig = JSON.stringify(held);
     if (sig !== this.lastSentHeld || hasPulse) {
       this.lastSentHeld = sig;
-      this.net.send({ type: 'input', held, pulse });
+      this.net.send({ type: 'input', slot: this.mySlot, held, pulse });
     }
   }
   sendSnapshot() {
@@ -399,7 +420,7 @@ export class Game {
         stun: Math.round(f.stun * 100) / 100, inv: Math.round(f.inv * 100) / 100, flash: Math.round(f.flash * 100) / 100,
         blocking: f.blocking, parryT: Math.round(f.parryT * 100) / 100, climbing: f.climbing,
         ragdollT: Math.round(f.ragdollT * 100) / 100, ko: f.ko, grounded: f.grounded, ghost: f.ghost,
-        wins: f.wins, anim: f.anim, act: f.act, ledge: f.ledge,
+        wins: f.wins, anim: f.anim, act: f.act, ledge: f.ledge, ai: f.ai, tag: f.tag,
         mahoraga: Math.round((f.mahoraga || 0) * 10) / 10, adaptSpin: Math.round((f.adaptSpin || 0) * 100) / 100,
         qte: f.qte, adaptN: Object.keys(f.adapt || {}).length,
       })),
@@ -428,7 +449,7 @@ export class Game {
         vx: sf.vx, vy: sf.vy, face: sf.face, hp: sf.hp, ce: sf.ce, cd: sf.cd, amp: sf.amp, ampMul: sf.ampMul, ampSpd: sf.ampSpd,
         aura: sf.aura, auraC: sf.auraC, combo: sf.combo, comboT: sf.comboT, stun: sf.stun, inv: sf.inv, flash: sf.flash,
         blocking: sf.blocking, parryT: sf.parryT, climbing: sf.climbing, ragdollT: sf.ragdollT, ko: sf.ko,
-        grounded: sf.grounded, ghost: sf.ghost, wins: sf.wins, anim: sf.anim, act: sf.act, ledge: sf.ledge,
+        grounded: sf.grounded, ghost: sf.ghost, wins: sf.wins, anim: sf.anim, act: sf.act, ledge: sf.ledge, ai: sf.ai, tag: sf.tag,
         mahoraga: sf.mahoraga || 0, adaptSpin: sf.adaptSpin || 0, qte: sf.qte || null, adaptN: sf.adaptN || 0,
       });
     });
@@ -601,17 +622,18 @@ export class Game {
     this.shake = 18; this.freeze = 0.14; this.sfx.ko();
   }
   step(f, o, dt, can) {
-    const c = this.controls[f.i % 2];
+    const c = this.controls[this.net ? 0 : f.i] || this.controls[0];
     let inp = {};
     if (f.ai) {
       inp = this.aiInput(f, o, dt, can && !f.ko);
-    } else if (this.netRole === 'host' && f.i === 1) {
+    } else if (this.netRole === 'host' && f.i > 0) {
+      const rh = this.remoteHeld[f.i] || {}, rp = this.remotePulse[f.i] || {};
       for (const k in c) {
-        const d = !!this.remoteHeld[k] || !!this.remotePulse[k];
-        inp[k] = (d && !this.prev[1][k]) || !!this.remotePulse[k];
-        this.prev[1][k] = !!this.remoteHeld[k];
-        inp['_' + k] = !!this.remoteHeld[k];
-        this.remotePulse[k] = false;
+        const d = !!rh[k] || !!rp[k];
+        inp[k] = (d && !this.prev[f.i][k]) || !!rp[k];
+        this.prev[f.i][k] = !!rh[k];
+        inp['_' + k] = !!rh[k];
+        rp[k] = false;
       }
     } else {
       for (const k in c) { const d = c[k].some((x) => this.keys.has(x)); inp[k] = d && !this.prev[f.i][k]; this.prev[f.i][k] = d; inp['_' + k] = d; }
@@ -1127,7 +1149,7 @@ export class Game {
         c.fillStyle = inWin ? '#ffd24a' : '#ffa726aa'; c.fillRect(qx - 150 + w0, qy + 5, 300 - w0, 12);
         c.fillStyle = '#fff'; c.fillRect(qx - 150 + p * 300 - 3, qy + 2, 6, 18);
         c.font = `14px ${FONT}`; c.fillStyle = inWin ? '#ffd24a' : '#fff';
-        c.fillText(`QTE ×${q.mul}! TAP [${this.hints[f.i % 2][4]}]`, qx, qy - 8);
+        c.fillText(`QTE ×${q.mul}! TAP [${(this.hints[f.i] || this.hints[0])[4]}]`, qx, qy - 8);
       } else if (q.ok) {
         c.font = `20px ${FONT}`; c.fillStyle = '#ffd24a'; c.shadowColor = '#ffd24a'; c.shadowBlur = 16;
         c.fillText(`OVERDRIVE QTE ACTIVATED ×${q.mul}!`, qx, qy);
@@ -1626,7 +1648,7 @@ export class Game {
     c.beginPath(); c.arc(x, y, rCur, 0, 7);
     c.strokeStyle = inWin ? '#fff' : '#ffab40'; c.lineWidth = 3; c.stroke();
     c.font = `12px ${FONT}`; c.lineWidth = 4; c.strokeStyle = '#000';
-    const txt = `QTE [${this.hints[f.i % 2][4]}] ×${q.mul}`;
+    const txt = `QTE [${(this.hints[f.i] || this.hints[0])[4]}] ×${q.mul}`;
     c.strokeText(txt, x, y - 34); c.fillStyle = inWin ? '#ffd24a' : '#fff'; c.fillText(txt, x, y - 34);
     c.restore();
   }
@@ -2220,7 +2242,7 @@ export class Game {
       if (o) {
         const x = o.team ? W * 0.75 : W * 0.25, k = clamp(1 - d.t / OPEN, 0, 1);
         c.globalAlpha = 0.75 + 0.25 * Math.sin(this.time * 26); c.shadowColor = o.color; c.shadowBlur = 24; c.fillStyle = '#fff'; c.font = `30px ${FONT}`;
-        c.fillText(`COUNTER! PRESS [${this.hints[o.i % 2][3]}]`, x, 640); c.fillStyle = o.color; c.fillRect(x - 170, 664, 340 * k, 8);
+        c.fillText(`COUNTER! PRESS [${(this.hints[o.i] || this.hints[0])[3]}]`, x, 640); c.fillStyle = o.color; c.fillRect(x - 170, 664, 340 * k, 8);
       }
     } else if (d.st === 'clash') {
       const k = d.clash, bw = 760, bx = W / 2 - bw / 2, by = 205, bh = 34;
@@ -2233,7 +2255,7 @@ export class Game {
       [a, b].forEach((f, idx) => {
         c.save(); c.translate(idx ? W * 0.8 : W * 0.2, 350); c.scale(1 + k.pulse[idx] * 0.25, 1 + k.pulse[idx] * 0.25);
         c.fillStyle = f.color; c.shadowColor = f.color; c.shadowBlur = 24; c.font = `96px ${FONT}`; c.fillText(String(k.n[idx]), 0, 0);
-        c.shadowBlur = 0; c.fillStyle = '#fff'; c.font = `24px ${FONT}`; c.fillText(f.ai ? 'CPU MASHING!' : `MASH [${this.hints[f.i % 2][3]}] !!!`, 0, 72); c.restore();
+        c.shadowBlur = 0; c.fillStyle = '#fff'; c.font = `24px ${FONT}`; c.fillText(f.ai ? 'CPU MASHING!' : `MASH [${(this.hints[f.i] || this.hints[0])[3]}] !!!`, 0, 72); c.restore();
       });
     } else if (d.st === 'linger') {
       const info = DOMAINS[d.id], rem = Math.max(0, d.lingerDur - d.lingerT);
@@ -2249,8 +2271,8 @@ export class Game {
     c.restore();
   }
   drawRhythm(d) {
-    const c = this.c, F = this.fighters[d.owner], O = this.enemiesOf(F).find((e) => !e.ko) || this.fighters[1 - (d.owner % 2)];
-    const A = DOMAINS[d.id].art, HF = this.hints[F.i % 2], HO = this.hints[O.i % 2];
+    const c = this.c, F = this.fighters[d.owner], O = this.enemiesOf(F).find((e) => !e.ko) || this.fighters.find((x) => x.team !== F.team) || this.fighters[0];
+    const A = DOMAINS[d.id].art, HF = this.hints[F.i] || this.hints[0], HO = this.hints[O.i] || this.hints[0];
     const cx = W / 2, y = 640, hz = cx - 230, spd = 430, left = cx - 330, right = cx + 340, on = d.st === 'run';
     const txt = (s, x, yy, size, col, al) => { c.textAlign = al; c.font = `${size}px ${FONT}`; c.lineWidth = 4; c.strokeStyle = '#000'; c.lineJoin = 'round'; c.strokeText(s, x, yy); c.fillStyle = col; c.fillText(s, x, yy); };
     c.save(); c.textBaseline = 'middle';
@@ -2281,27 +2303,32 @@ export class Game {
   drawHud() {
     const c = this.c, T = this.cfg.target; c.textBaseline = 'middle';
     const label = (s, tx, ty, size, col, al) => { c.textAlign = al; c.font = `${size}px ${FONT}`; c.lineWidth = 5; c.strokeStyle = '#000'; c.lineJoin = 'round'; c.strokeText(s, tx, ty); c.fillStyle = col; c.fillText(s, tx, ty); };
-    this.fighters.slice(0, 2).forEach((f, i) => {
+    const teams = [this.fighters.filter((f) => f.team === 0), this.fighters.filter((f) => f.team === 1)];
+    teams.forEach((members, i) => {
+      if (!members.length) return;
+      const f = (this.net ? members.find((m) => m.i === this.mySlot) : null) || members[0];
+      const others = members.filter((m) => m !== f);
+      const hf = this.hints[f.i] || this.hints[0];
       const w = 500, x = i ? W - 40 - w : 40, sk = i ? -20 : 20, at = (wd) => (i ? x + w - wd : x), hpw = (v) => (w * v) / 100, low = f.hp < 30;
-      const wins = this.wins[f.team];
+      const wins = this.wins[i];
       this.pg(x - 4, 42, w + 8, 36, sk); c.fillStyle = '#000'; c.fill();
       c.save(); this.pg(x, 46, w, 28, sk); c.clip();
       c.fillStyle = '#1a1226'; c.fillRect(x - 30, 46, w + 60, 28);
       c.fillStyle = '#ffd24a'; c.fillRect(at(hpw(f.hpShow)), 46, hpw(f.hpShow), 28);
-      c.fillStyle = f.color; c.fillRect(at(hpw(f.hp)), 46, hpw(f.hp), 28);
+      c.fillStyle = f.ko ? '#555' : f.color; c.fillRect(at(hpw(f.hp)), 46, hpw(f.hp), 28);
       c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(at(hpw(f.hp)), 46, hpw(f.hp), 8);
       c.restore();
-      this.pg(x - 4, 42, w + 8, 36, sk); c.strokeStyle = low ? `rgba(255,45,85,${0.6 + 0.4 * Math.sin(this.time * 12)})` : '#fff'; c.lineWidth = 3; c.stroke();
+      this.pg(x - 4, 42, w + 8, 36, sk); c.strokeStyle = low && !f.ko ? `rgba(255,45,85,${0.6 + 0.4 * Math.sin(this.time * 12)})` : '#fff'; c.lineWidth = 3; c.stroke();
       const tx = i ? x + w - 6 : x + 6, dTag = { easy: 'EASY', medium: 'MED', hard: 'HARD' }[this.aiDiff] || 'CPU';
-      const disp = f.ai ? `${f.name} [CPU · ${dTag}]` : f.name; c.font = `24px ${FONT}`; const nw = c.measureText(disp).width;
-      label(disp, tx, 26, 24, '#fff', i ? 'right' : 'left');
-      if (f.jp) label(f.jp, tx + (i ? -(nw + 12) : nw + 12), 28, 15, f.color, i ? 'right' : 'left');
+      const disp = f.ai ? `${f.tag}: ${f.name} [${dTag}]` : `${this.is2v2 ? f.tag + ': ' : ''}${f.name}`; c.font = `24px ${FONT}`; const nw = c.measureText(disp).width;
+      label(disp, tx, 26, 24, f.ko ? '#888' : '#fff', i ? 'right' : 'left');
+      if (f.jp && !this.is2v2) label(f.jp, tx + (i ? -(nw + 12) : nw + 12), 28, 15, f.color, i ? 'right' : 'left');
       for (let k = 0; k < T; k++) { const px = i ? x + 16 + k * 24 : x + w - 16 - k * 24; c.beginPath(); c.moveTo(px, 17); c.lineTo(px + 8, 26); c.lineTo(px, 35); c.lineTo(px - 8, 26); c.closePath(); if (k < wins) { c.fillStyle = f.color; c.fill(); } c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); }
       const cw = 380, cx0 = i ? x + w - cw : x, full = f.ce >= 100, pulse = full ? 0.65 + 0.35 * Math.sin(this.time * 10) : 1, ce = (cw * f.ce) / 100;
       c.save(); this.pg(cx0, 82, cw, 10, sk * 0.5); c.clip(); c.fillStyle = '#120a22'; c.fillRect(cx0 - 20, 82, cw + 40, 10);
       c.globalAlpha = pulse; c.fillStyle = full ? '#ffd24a' : '#8b5cf6'; c.fillRect(i ? cx0 + cw - ce : cx0, 82, ce, 10); c.restore();
       this.pg(cx0, 82, cw, 10, sk * 0.5); c.strokeStyle = '#b388ff'; c.lineWidth = 1.5; c.stroke();
-      label(full ? `領域展開 [${this.hints[i][3]}]` : `${Math.floor(f.ce)}%`, i ? cx0 - 8 : cx0 + cw + 8, 88, 12, full ? '#ffd24a' : '#d1c4e9', i ? 'right' : 'left');
+      label(full ? `領域展開 [${hf[3]}]` : `${Math.floor(f.ce)}%`, i ? cx0 - 8 : cx0 + cw + 8, 88, 12, full ? '#ffd24a' : '#d1c4e9', i ? 'right' : 'left');
       const off = i ? w - 466 : 0;
       for (let s = 0; s < 3; s++) {
         const id = this.effectiveSkill(f, s), sk2 = id && SKILLS[id], tw = 150, sx = x + off + s * 158; if (!sk2) continue;
@@ -2309,32 +2336,30 @@ export class Game {
         c.save(); this.pg(sx, 98, tw, 26, 8); c.clip(); c.fillStyle = '#120a22'; c.fillRect(sx - 10, 98, tw + 20, 26);
         c.fillStyle = ready ? sk2.color : sk2.color + '55'; c.fillRect(sx - 10, 98, (tw + 20) * Math.min(1, r), 26); c.restore();
         this.pg(sx, 98, tw, 26, 8); c.strokeStyle = sk2.color; c.lineWidth = 2; c.stroke();
-        c.textAlign = 'center'; c.font = `10px ${FONT}`; c.fillStyle = ready ? '#000' : '#fff'; c.fillText(`[${this.hints[i][s]}] ${sk2.short}${ready ? '' : ' ' + f.cd[s].toFixed(1)}`, sx + tw / 2, 112);
+        c.textAlign = 'center'; c.font = `10px ${FONT}`; c.fillStyle = ready ? '#000' : '#fff'; c.fillText(`[${hf[s]}] ${sk2.short}${ready ? '' : ' ' + f.cd[s].toFixed(1)}`, sx + tw / 2, 112);
       }
-      const buffY = this.is2v2 ? 188 : 140, comboY = this.is2v2 ? 216 : 168;
+      others.forEach((m, idx) => {
+        const mw = 250, mx = i ? W - 40 - mw : 40, msk = i ? -10 : 10, mat = (wd) => (i ? mx + mw - wd : mx), mhpw = (v) => (mw * v) / 100;
+        const y0 = 144 + idx * 38;
+        label(`${m.tag}: ${m.name}`, i ? mx + mw : mx, y0 - 11, 12, m.ko ? '#777' : '#fff', i ? 'right' : 'left');
+        this.pg(mx - 2, y0 - 2, mw + 4, 16, msk); c.fillStyle = '#000'; c.fill();
+        c.save(); this.pg(mx, y0, mw, 12, msk); c.clip();
+        c.fillStyle = '#1a1226'; c.fillRect(mx - 20, y0, mw + 40, 12);
+        c.fillStyle = '#ffd24a'; c.fillRect(mat(mhpw(m.hpShow)), y0, mhpw(m.hpShow), 12);
+        c.fillStyle = m.ko ? '#555' : m.color; c.fillRect(mat(mhpw(m.hp)), y0, mhpw(m.hp), 12);
+        c.restore();
+        this.pg(mx - 2, y0 - 2, mw + 4, 16, msk); c.strokeStyle = m.ko ? '#555' : '#ffffffaa'; c.lineWidth = 2; c.stroke();
+        const mcw = 150, mcx0 = i ? mx + mw - mcw : mx, mce = (mcw * m.ce) / 100;
+        c.fillStyle = '#120a22'; c.fillRect(mcx0, y0 + 18, mcw, 5);
+        c.fillStyle = m.ce >= 100 ? '#ffd24a' : '#8b5cf6'; c.fillRect(i ? mcx0 + mcw - mce : mcx0, y0 + 18, mce, 5);
+        label(`${Math.floor(m.ce)}%`, i ? mcx0 - 6 : mcx0 + mcw + 6, y0 + 21, 10, '#d1c4e9', i ? 'right' : 'left');
+      });
+      const buffY = 140 + others.length * 44, comboY = buffY + 28;
       const adN = f.adaptN ?? Object.keys(f.adapt || {}).length;
       if (f.mahoraga > 0) label(`MAHORAGA ${f.mahoraga.toFixed(1)}s · ADAPT x${adN}`, i ? x + w : x, buffY, 13, '#ffd54f', i ? 'right' : 'left');
       else if (f.amp > 0) label(`BUFF ${f.amp.toFixed(1)}s`, i ? x + w : x, buffY, 13, f.auraC, i ? 'right' : 'left');
       if (f.combo >= 2 && f.comboT > 0) { c.shadowColor = '#ff6d00'; c.shadowBlur = 16; label(`${f.combo} HIT COMBO!`, i ? x + w : x, comboY, 30, '#ffeb3b', i ? 'right' : 'left'); c.shadowBlur = 0; }
     });
-    if (this.is2v2) {
-      this.fighters.slice(2, 4).forEach((f, idx) => {
-        const w = 236, x = idx ? W - 40 - w : 40, sk = idx ? -10 : 10, at = (wd) => (idx ? x + w - wd : x), hpw = (v) => (w * v) / 100;
-        const y0 = 144;
-        label(`${f.tag}: ${f.name}`, idx ? x + w : x, y0 - 11, 12, f.ko ? '#777' : '#fff', idx ? 'right' : 'left');
-        this.pg(x - 2, y0 - 2, w + 4, 16, sk); c.fillStyle = '#000'; c.fill();
-        c.save(); this.pg(x, y0, w, 12, sk); c.clip();
-        c.fillStyle = '#1a1226'; c.fillRect(x - 20, y0, w + 40, 12);
-        c.fillStyle = '#ffd24a'; c.fillRect(at(hpw(f.hpShow)), y0, hpw(f.hpShow), 12);
-        c.fillStyle = f.ko ? '#555' : f.color; c.fillRect(at(hpw(f.hp)), y0, hpw(f.hp), 12);
-        c.restore();
-        this.pg(x - 2, y0 - 2, w + 4, 16, sk); c.strokeStyle = f.ko ? '#555' : '#ffffffaa'; c.lineWidth = 2; c.stroke();
-        const cw = 150, cx0 = idx ? x + w - cw : x, ce = (cw * f.ce) / 100;
-        c.fillStyle = '#120a22'; c.fillRect(cx0, y0 + 18, cw, 5);
-        c.fillStyle = f.ce >= 100 ? '#ffd24a' : '#8b5cf6'; c.fillRect(idx ? cx0 + cw - ce : cx0, y0 + 18, ce, 5);
-        label(`${Math.floor(f.ce)}%`, idx ? cx0 - 6 : cx0 + cw + 6, y0 + 21, 10, '#d1c4e9', idx ? 'right' : 'left');
-      });
-    }
     const tcx = W / 2, tcy = 60, frac = clamp(this.timer / 99, 0, 1), urgent = this.timer < 10;
     c.beginPath(); c.arc(tcx, tcy, 38, 0, 7); c.fillStyle = '#000'; c.fill(); c.lineWidth = 6; c.strokeStyle = '#ffffff33'; c.stroke();
     c.beginPath(); c.arc(tcx, tcy, 38, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); c.strokeStyle = urgent ? '#ff2d55' : '#fff'; c.stroke();

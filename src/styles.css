@@ -68,6 +68,9 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- แผงตัดมุม (ใช้ทั้งเลือกนักสู้และตั้งปุ่ม) ---------- */
 .players { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+.players.four { display: grid; grid-template-columns: repeat(2, minmax(0, 520px)); gap: 14px; justify-content: center; width: min(96vw, 1060px); }
+.players.four .panel { width: 100%; }
+@media (max-width: 900px) { .players.four { grid-template-columns: minmax(0, 520px); } }
 .vs { align-self: center; font-family: var(--display); font-size: 56px; color: var(--gold); -webkit-text-stroke: 3px #000; paint-order: stroke fill; transform: skewX(-8deg) rotate(-6deg); text-shadow: 4px 4px 0 var(--red); }
 @media (max-width: 1140px) { .vs { display: none; } }
 .panel { --c: #fff; --cut: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
@@ -148,8 +151,22 @@ button { font-family: inherit; cursor: pointer; }
 .pill { font-size: 12px; font-weight: 700; padding: 4px 10px; background: #ffffff18; border-radius: 3px; }
 .pill.ok { background: #1b5e20; color: #b9f6ca; }
 .pill.wait { background: #4a2c00; color: #ffe082; }
-.panel.locked { opacity: .78; }
+.panel.locked { opacity: .82; }
 .panel.locked .swatches button, .panel.locked .skins button, .panel.locked .chars button, .panel.locked .skills button, .panel.locked .mini, .panel.locked .ally-chip { pointer-events: none; }
+.slot-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #ffffff20; }
+.slot-grp { display: flex; gap: 5px; align-items: center; }
+.slot-btn { background: #ffffff10; color: #ddd; border: 1px solid #ffffff2e; padding: 4px 10px; font-size: 11.5px; font-weight: 700; transform: skewX(-6deg); transition: background .12s, border-color .12s; }
+.slot-btn:hover:not(:disabled) { background: #ffffff24; }
+.slot-btn:disabled { opacity: .45; cursor: not-allowed; }
+.slot-btn.team-a.on { background: #1976d2; border-color: #64b5f6; color: #fff; box-shadow: 0 0 10px #42a5f566; }
+.slot-btn.team-b.on { background: #d32f2f; border-color: #ef5350; color: #fff; box-shadow: 0 0 10px #ef535066; }
+.slot-btn.bot.on { background: var(--gold); border-color: var(--gold); color: #000; }
+.slot-tag { font-size: 11px; font-weight: 700; padding: 3px 8px; background: #ffffff15; border-radius: 3px; color: #cfd8dc; }
+.team-summary { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; width: min(96vw, 1060px); background: #100820cc; border: 1px solid #ffffff26; padding: 8px 16px; }
+.ts-side { font-size: 13px; font-weight: 600; color: #fff; padding: 4px 12px; border-left: 4px solid #fff; background: #ffffff0a; }
+.ts-side.a { border-left-color: #42a5f5; }
+.ts-side.b { border-left-color: #ef5350; }
+.ts-vs { font-family: var(--display); font-size: 18px; color: var(--gold); }
 .ally-box { margin-top: 10px; padding-top: 8px; border-top: 1px solid #ffffff20; }
 .ally-lbl { display: block; font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
 .ally-list { display: flex; gap: 5px; flex-wrap: wrap; max-height: 76px; overflow-y: auto; }

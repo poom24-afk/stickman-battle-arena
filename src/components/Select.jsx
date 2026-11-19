@@ -35,14 +35,17 @@ const Stick = ({ color, gear }) => (
   </svg>
 );
 
-function Panel({ i, cfg, setCfg, locked, badge }) {
+function Panel({ i, cfg, setCfg, locked, badge, canPickTeam, canToggleBot, isOnlinePeer }) {
   const [tab, setTab] = useState('char');
   const [filter, setFilter] = useState('all');
+  const is2v2 = cfg.mode === '2v2';
   const chId = cfg.chars[i], ch = CHARACTERS[chId] || null, color = cfg.colors[i], loadout = cfg.loadouts[i];
+  const team = is2v2 ? (cfg.teams?.[i] ?? (i % 2)) : (i % 2);
+  const slotMode = is2v2 ? (cfg.slotModes?.[i] || (i >= 2 ? 'bot' : 'human')) : (i === 1 && cfg.p2Ai ? 'bot' : 'human');
   const skins = (chId && SKINS[chId]) || [];
   const skinId = cfg.skins?.[i] || 'default';
   const curSkin = skins.find((s) => s.id === skinId) || skins[0] || null;
-  const upd = (c, k, v) => (c[k] || ['default', 'default']).map((x, j) => (j === i ? v : x));
+  const upd = (c, k, v) => (c[k] || []).map((x, j) => (j === i ? v : x));
 
   const pick = (id) => {
     if (locked) return;
@@ -55,7 +58,7 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
         skins: upd(c, 'skins', 'default'),
         loadouts: n ? upd(c, 'loadouts', [...n.skills]) : c.loadouts,
         domains: n ? upd(c, 'domains', n.domain) : c.domains,
-        colors: targetCol && !c.colors.includes(targetCol) ? upd(c, 'colors', targetCol) : c.colors,
+        colors: targetCol && (is2v2 || !c.colors.slice(0, 2).includes(targetCol)) ? upd(c, 'colors', targetCol) : c.colors,
       };
     });
   };
@@ -64,8 +67,24 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
     setCfg((c) => ({
       ...c,
       skins: upd(c, 'skins', sk.id),
-      colors: sk.color && c.colors[1 - i] !== sk.color ? upd(c, 'colors', sk.color) : c.colors,
+      colors: sk.color && (is2v2 || c.colors[1 - i] !== sk.color) ? upd(c, 'colors', sk.color) : c.colors,
     }));
+  };
+  const setTeam = (t) => {
+    if (!canPickTeam) return;
+    setCfg((c) => ({ ...c, teams: upd(c, 'teams', t) }));
+  };
+  const toggleBot = () => {
+    if (!canToggleBot) return;
+    setCfg((c) => {
+      const cur = c.slotModes?.[i] || 'human';
+      const nxt = cur === 'bot' ? 'human' : 'bot';
+      return {
+        ...c,
+        slotModes: upd(c, 'slotModes', nxt),
+        p2Ai: i === 1 ? nxt === 'bot' : c.p2Ai,
+      };
+    });
   };
   const toggle = (s) => {
     if (locked) return;
@@ -95,10 +114,26 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
           <p className="trait">{ch ? <><b>{ch.pasName}</b> {ch.pasDesc}</> : 'สติ๊กแมนธรรมดา ไม่มีพลังพิเศษประจำตัว'}</p>
         </div>
       </div>
+      {is2v2 && (
+        <div className="slot-bar">
+          <div className="slot-grp" role="group" aria-label={`เลือกฝั่ง P${i + 1}`}>
+            <button className={'slot-btn team-a' + (team === 0 ? ' on' : '')} disabled={!canPickTeam} onClick={() => setTeam(0)}>🔵 ทีม A</button>
+            <button className={'slot-btn team-b' + (team === 1 ? ' on' : '')} disabled={!canPickTeam} onClick={() => setTeam(1)}>🔴 ทีม B</button>
+          </div>
+          {i > 0 || canToggleBot ? (
+            <button className={'slot-btn bot' + (slotMode === 'bot' ? ' on' : '')} disabled={!canToggleBot || isOnlinePeer}
+              onClick={toggleBot} title={isOnlinePeer ? 'มีผู้เล่นออนไลน์ควบคุมช่องนี้อยู่' : 'สลับระหว่างคนเล่นและบอท'}>
+              {isOnlinePeer ? '🌐 ผู้เล่นออนไลน์' : slotMode === 'bot' ? '🤖 บอท (AI)' : '👤 คนเล่น'}
+            </button>
+          ) : (
+            <span className="slot-tag">👤 คนเล่น</span>
+          )}
+        </div>
+      )}
       <div className="swatches">
         {COLORS.map((col) => (
           <button key={col} aria-label={`สี ${col}`} className={'sw' + (color === col ? ' on' : '')} style={{ background: col }}
-            disabled={locked || cfg.colors[1 - i] === col} onClick={() => !locked && setCfg((c) => ({ ...c, colors: upd(c, 'colors', col) }))} />
+            disabled={locked || (!is2v2 && cfg.colors[1 - i] === col)} onClick={() => !locked && setCfg((c) => ({ ...c, colors: upd(c, 'colors', col) }))} />
         ))}
       </div>
       {skins.length > 0 && (
@@ -178,50 +213,74 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
         </>
       )}
       {tab !== 'dom' && <p className="dline">โดเมน: <b>{DOMAINS[cfg.domains[i]].jp}</b> {DOMAINS[cfg.domains[i]].name}</p>}
-      {cfg.mode === '2v2' && (
-        <div className="ally-box">
-          <span className="ally-lbl">คู่หู AI ประจำทีม {i === 0 ? 'A' : 'B'}:</span>
-          <div className="ally-list">
-            {CHAR_IDS.map((id) => (
-              <button key={id} disabled={locked}
-                className={'ally-chip' + ((cfg.allies?.[i] || 'yuji') === id ? ' on' : '')}
-                style={{ '--k': CHARACTERS[id].color }}
-                onClick={() => !locked && setCfg((c) => ({ ...c, allies: (c.allies || ['yuji', 'mahito']).map((x, j) => (j === i ? id : x)) }))}>
-                {CHARACTERS[id].name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </section>
   );
 }
 
 export default function Select({ cfg, setCfg, onStart, onBack, onSettings, online }) {
-  const ready = cfg.loadouts.every((l) => l.length === 3);
+  const is2v2 = cfg.mode === '2v2';
+  const slots = is2v2 ? [0, 1, 2, 3] : [0, 1];
+  const readyLoadouts = slots.every((i) => cfg.loadouts[i]?.length === 3);
   const isGuest = online?.role === 'guest';
   const isHost = online?.role === 'host';
-  const myIdx = isGuest ? 1 : 0;
-  const is2v2 = cfg.mode === '2v2';
+  const mySlot = online ? (online.mySlot ?? (isGuest ? 1 : 0)) : 0;
+  const occ = online?.occupied || [true, false, false, false];
+  const rdyMap = online?.ready || [true, false, false, false];
   const diffLabel = { easy: 'ง่าย', medium: 'ปานกลาง', hard: 'ยาก' }[cfg.aiDiff || 'medium'];
+
+  const teams = slots.map((i) => (is2v2 ? (cfg.teams?.[i] ?? (i % 2)) : (i % 2)));
+  const teamACount = teams.filter((t) => t === 0).length;
+  const teamBCount = teams.filter((t) => t === 1).length;
+  const teamsValid = teamACount >= 1 && teamBCount >= 1;
+  const hasAnyBot = is2v2 ? slots.some((i) => (cfg.slotModes?.[i] || 'human') === 'bot') : cfg.p2Ai;
+
+  const connectedGuests = slots.filter((i) => i > 0 && occ[i]);
+  const allGuestsReady = connectedGuests.every((i) => rdyMap[i]);
+  const waitingHumans = is2v2
+    ? slots.filter((i) => i > 0 && !occ[i] && (cfg.slotModes?.[i] || 'human') === 'human')
+    : (!occ[1] && !cfg.p2Ai ? [1] : []);
+  const onlineCanStart = isHost && readyLoadouts && teamsValid && allGuestsReady && waitingHumans.length === 0;
+  const ready = readyLoadouts && teamsValid;
+
+  const toggleMode = (m) => {
+    if (isGuest) return;
+    setCfg((c) => {
+      const next = { ...c, mode: m };
+      if (m === '2v2') {
+        next.slotModes = ['human', occ[1] ? 'human' : (c.p2Ai ? 'bot' : 'human'), occ[2] ? 'human' : 'bot', occ[3] ? 'human' : 'bot'];
+        next.teams = c.teams || [0, 1, 0, 1];
+      }
+      return next;
+    });
+  };
+
+  const slotBadge = (i) => {
+    const sm = is2v2 ? (cfg.slotModes?.[i] || 'human') : (i === 1 && cfg.p2Ai ? 'bot' : 'human');
+    if (online) {
+      if (i === mySlot) return `คุณ (${isHost ? 'HOST' : 'GUEST'})`;
+      if (occ[i]) return rdyMap[i] ? 'ออนไลน์ · พร้อม ✓' : 'ออนไลน์ · กำลังเลือก…';
+      return sm === 'bot' ? `🤖 บอท · ${diffLabel}` : 'รอเพื่อนเข้าห้อง…';
+    }
+    return sm === 'bot' ? `🤖 บอท · ${diffLabel}` : '👤 คนเล่น';
+  };
 
   return (
     <div className="screen select">
-      <h2 className="title sm">{online ? 'ห้องสู้ต่อสู้ออนไลน์' : cfg.p2Ai ? `โหมดปะทะบอท (${diffLabel})` : 'เลือกนักสู้'}</h2>
+      <h2 className="title sm">{online ? 'ห้องสู้ต่อสู้ออนไลน์' : is2v2 ? 'โหมด 2v2 · จัดทีม P1–P4' : cfg.p2Ai ? `โหมดปะทะบอท (${diffLabel})` : 'เลือกนักสู้'}</h2>
       <div className="chips">
         {[['1v1', '⚔️ 1 vs 1 (สนามปกติ)'], ['2v2', '🔥 2 vs 2 (แมพใหญ่พิเศษ!)']].map(([m, lbl]) => (
           <button key={m} disabled={isGuest} className={'chip' + ((cfg.mode || '1v1') === m ? ' on' : '')}
-            onClick={() => !isGuest && setCfg((c) => ({ ...c, mode: m }))}>
+            onClick={() => toggleMode(m)}>
             {lbl}
           </button>
         ))}
-        {!online && (
-          <button className={'chip' + (cfg.p2Ai ? ' on' : '')} onClick={() => setCfg((c) => ({ ...c, p2Ai: !c.p2Ai }))}>
-            {cfg.p2Ai ? (is2v2 ? '🤖 ฝั่งขวา: บอท 2 ตัว' : '🤖 คู่ต่อสู้: บอท (CPU)') : (is2v2 ? '👥 ฝั่งขวา: P2 + บอท' : '👥 คู่ต่อสู้: P2 (2 คน)')}
+        {!online && !is2v2 && (
+          <button className={'chip' + (cfg.p2Ai ? ' on' : '')} onClick={() => setCfg((c) => ({ ...c, p2Ai: !c.p2Ai, slotModes: (c.slotModes || ['human', 'human', 'bot', 'bot']).map((x, j) => (j === 1 ? (!c.p2Ai ? 'bot' : 'human') : x)) }))}>
+            {cfg.p2Ai ? '🤖 คู่ต่อสู้: บอท (CPU)' : '👥 คู่ต่อสู้: P2 (2 คน)'}
           </button>
         )}
       </div>
-      {!online && (cfg.p2Ai || is2v2) && (
+      {(hasAnyBot || is2v2) && !isGuest && (
         <div className="chips" role="group" aria-label="ระดับความยากบอท">
           <span style={{ alignSelf: 'center', fontSize: 13, fontWeight: 700, opacity: 0.85 }}>ระดับบอท:</span>
           {[['easy', '🌱 ง่าย'], ['medium', '⚡ ปานกลาง'], ['hard', '💀 ยาก']].map(([d, lbl]) => (
@@ -232,26 +291,54 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
           ))}
         </div>
       )}
+      {is2v2 && (
+        <div className="team-summary">
+          <div className="ts-side team-a">
+            <b>🔵 ทีม A ({teamACount})</b>
+            <span>{slots.filter((i) => teams[i] === 0).map((i) => `P${i + 1} ${CHARACTERS[cfg.chars[i]]?.name || 'STICK'}${(cfg.slotModes?.[i] || 'human') === 'bot' && !(online && occ[i]) ? '(BOT)' : ''}`).join(' · ') || 'ว่าง'}</span>
+          </div>
+          <div className="ts-vs">VS</div>
+          <div className="ts-side team-b">
+            <b>🔴 ทีม B ({teamBCount})</b>
+            <span>{slots.filter((i) => teams[i] === 1).map((i) => `P${i + 1} ${CHARACTERS[cfg.chars[i]]?.name || 'STICK'}${(cfg.slotModes?.[i] || 'human') === 'bot' && !(online && occ[i]) ? '(BOT)' : ''}`).join(' · ') || 'ว่าง'}</span>
+          </div>
+        </div>
+      )}
+      {!teamsValid && <p className="hint" style={{ opacity: 1, color: '#ff5252', fontWeight: 700 }}>⚠ ทั้งทีม A และทีม B ต้องมีผู้เล่น/บอทอย่างน้อยฝั่งละ 1 ตัว!</p>}
       {online && (
         <div className="online-bar">
           <span>รหัสห้อง:</span>
           <span className="room-code">{online.code}</span>
           <button className="mini" onClick={online.onCopyLink}>{online.copied ? 'คัดลอกลิงก์แล้ว ✓' : 'คัดลอกลิงก์เชิญ'}</button>
-          <span className={'pill ' + (online.peerConnected ? 'ok' : 'wait')}>
-            {online.peerConnected ? (isHost ? (online.peerReady ? 'P2 พร้อมแล้ว ✓' : 'P2 กำลังเลือกตัว…') : 'เชื่อมต่อกับ Host แล้ว ✓') : 'กำลังรอเพื่อนเข้าห้อง…'}
-          </span>
+          {slots.filter((i) => i > 0 && (is2v2 || i === 1)).map((i) => (
+            <span key={i} className={'pill ' + (occ[i] ? (rdyMap[i] ? 'ok' : 'wait') : '')}>
+              P{i + 1}: {occ[i] ? (rdyMap[i] ? 'พร้อม ✓' : 'กำลังเลือก…') : ((cfg.slotModes?.[i] === 'bot') ? '🤖 บอท' : 'รอเพื่อน…')}
+            </span>
+          ))}
           {online.pingMs !== null && <span className="pill">Ping {online.pingMs}ms</span>}
         </div>
       )}
       {online?.error && <p className="hint" style={{ opacity: 1, color: '#ff5252', fontWeight: 700 }}>{online.error}</p>}
-      <div className="players">
-        <Panel i={0} cfg={cfg} setCfg={setCfg}
-          locked={!!online && myIdx !== 0}
-          badge={online ? (myIdx === 0 ? 'คุณ (HOST)' : 'คู่ต่อสู้ (HOST)') : ''} />
-        <span className="vs" aria-hidden="true">VS</span>
-        <Panel i={1} cfg={cfg} setCfg={setCfg}
-          locked={!!online && myIdx !== 1}
-          badge={online ? (myIdx === 1 ? 'คุณ (GUEST)' : 'คู่ต่อสู้ (GUEST)') : (cfg.p2Ai ? `บอท · ${diffLabel}` : '')} />
+      <div className={'players' + (is2v2 ? ' four' : '')}>
+        {slots.map((i) => {
+          const isOnlinePeer = !!online && i > 0 && !!occ[i];
+          const isLocked = online ? (isHost ? (i > 0 && occ[i]) : i !== mySlot) : false;
+          const canPickTeam = is2v2 && (online ? (isHost || i === mySlot) : true);
+          const canToggleBot = is2v2 && (online ? (isHost && i > 0 && !occ[i]) : true);
+          return (
+            <Panel
+              key={i}
+              i={i}
+              cfg={cfg}
+              setCfg={setCfg}
+              locked={isLocked}
+              canPickTeam={canPickTeam}
+              canToggleBot={canToggleBot}
+              isOnlinePeer={isOnlinePeer}
+              badge={slotBadge(i)}
+            />
+          );
+        })}
       </div>
       <h3 className="sub">สนามต่อสู้ {isGuest ? '(หัวหน้าห้องเป็นคนเลือก)' : ''}</h3>
       <div className="arenas">
@@ -276,8 +363,8 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
         )}
         {!online && <button className="btn big" onClick={onStart} disabled={!ready}>สู้เลย!</button>}
         {isHost && (
-          <button className="btn big" onClick={onStart} disabled={!ready || !online.peerConnected || !online.peerReady}>
-            {!online.peerConnected ? 'รอเพื่อนเข้าห้อง…' : !online.peerReady ? 'รอเพื่อนกดพร้อม…' : 'สู้เลย!'}
+          <button className="btn big" onClick={onStart} disabled={!onlineCanStart}>
+            {waitingHumans.length > 0 ? `รอ P${waitingHumans[0] + 1} เข้าห้อง (หรือตั้งเป็นบอท)` : !allGuestsReady ? 'รอเพื่อนกดพร้อม…' : !teamsValid ? 'ต้องมีอย่างน้อยฝั่งละ 1 คน' : 'สู้เลย!'}
           </button>
         )}
         {isGuest && (

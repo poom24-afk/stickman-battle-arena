@@ -20,11 +20,22 @@ export class NetClient {
     this.ws = null;
     this.peer = null;
     this.conn = null;
+    this.conns = new Map(); // Host: slot (1..3) -> conn
+    this.hostCfg = null;
     this.role = null;
+    this.mySlot = 0;
     this.code = '';
     this.pingMs = null;
     this.handlers = new Set();
     this.pingTimer = null;
+  }
+
+  setHostCfg(cfg) {
+    this.hostCfg = cfg;
+  }
+
+  getOccupied() {
+    return [true, this.conns.has(1), this.conns.has(2), this.conns.has(3)];
   }
 
   emit(msg) {
@@ -42,25 +53,28 @@ export class NetClient {
     this.send({ type: 'ping', t: performance.now() });
   }
 
-  handleIncoming(msg) {
+  handleIncoming(msg, fromSlot = null, srcConn = null) {
     if (!msg || typeof msg.type !== 'string') return;
     if (msg.type === 'ping') {
-      this.send({ type: 'pong', t: msg.t });
+      if (srcConn && srcConn.open) srcConn.send({ type: 'pong', t: msg.t });
+      else this.send({ type: 'pong', t: msg.t });
       return;
     }
     if (msg.type === 'pong') {
       this.pingMs = Math.max(1, Math.round(performance.now() - msg.t));
     } else if (msg.type === 'created') {
-      this.role = 'host'; this.code = msg.code;
+      this.role = 'host'; this.mySlot = 0; this.code = msg.code;
     } else if (msg.type === 'joined') {
-      this.role = 'guest'; this.code = msg.code;
+      this.role = 'guest'; this.mySlot = msg.slot ?? 1; this.code = msg.code;
     }
+    if (fromSlot !== null && msg.slot === undefined) msg = { ...msg, slot: fromSlot };
     this.emit(msg);
   }
 
   async create(mode = 'p2p', cfg = null) {
     this.close();
     this.mode = mode;
+    this.hostCfg = cfg;
     if (mode === 'ws') {
       await this.connectWs();
       this.send({ type: 'create', cfg });
@@ -107,6 +121,7 @@ export class NetClient {
   }
 
   createP2p(cfg, attempt = 0) {
+    this.hostCfg = cfg;
     return new Promise((resolve, reject) => {
       const code = randCode();
       const peer = new Peer(PREFIX + code, { config: { iceServers: ICE, iceCandidatePoolSize: 4 } });
@@ -117,39 +132,43 @@ export class NetClient {
       peer.on('open', () => {
         opened = true;
         this.role = 'host';
+        this.mySlot = 0;
         this.code = code;
-        this.emit({ type: 'created', code, mode: 'p2p' });
+        this.emit({ type: 'created', code, mode: 'p2p', slot: 0 });
         resolve();
       });
 
       peer.on('connection', (conn) => {
-        if (this.conn && this.conn.open) {
+        const curCfg = this.hostCfg || cfg;
+        const candidates = curCfg?.mode === '2v2' ? [1, 2, 3] : [1];
+        const freeSlot = candidates.find((s) => !this.conns.has(s) || !this.conns.get(s).open);
+        if (!freeSlot) {
+          const cap = candidates.length + 1;
           const rejectBusy = () => {
-            conn.send({ type: 'error', message: 'ห้องนี้เต็มแล้ว (2/2)' });
+            conn.send({ type: 'error', message: `ห้องนี้เต็มแล้ว (${cap}/${cap})` });
             setTimeout(() => conn.close(), 200);
           };
           if (conn.open) rejectBusy(); else conn.on('open', rejectBusy);
           return;
         }
-        this.conn = conn;
+        this.conns.set(freeSlot, conn);
         let readyFired = false;
         const onReady = () => {
-          if (readyFired || this.conn !== conn) return;
+          if (readyFired || this.conns.get(freeSlot) !== conn) return;
           readyFired = true;
-          this.startPing();
-          if (cfg) conn.send({ type: 'cfg-sync', cfg });
-          this.emit({ type: 'peer-joined' });
+          const occ = this.getOccupied();
+          conn.send({ type: 'welcome', code: this.code, mode: 'p2p', slot: freeSlot, cfg: this.hostCfg || cfg, occupied: occ });
+          this.emit({ type: 'peer-joined', slot: freeSlot, occupied: occ });
         };
         if (conn.open) onReady(); else conn.on('open', onReady);
-        conn.on('data', (data) => this.handleIncoming(data));
+        conn.on('data', (data) => this.handleIncoming(data, freeSlot, conn));
         conn.on('error', (err) => {
-          this.emit({ type: 'error', message: `เชื่อมต่อเพื่อนไม่สำเร็จ (${err?.message || 'ICE failed'})` });
+          this.emit({ type: 'error', message: `P${freeSlot + 1} เชื่อมต่อไม่สำเร็จ (${err?.message || 'ICE failed'})` });
         });
         conn.on('close', () => {
-          clearInterval(this.pingTimer);
-          if (this.conn === conn) {
-            this.conn = null;
-            this.emit({ type: 'peer-left', reason: 'ผู้เล่น 2 ออกจากห้องแล้ว' });
+          if (this.conns.get(freeSlot) === conn) {
+            this.conns.delete(freeSlot);
+            this.emit({ type: 'peer-left', slot: freeSlot, occupied: this.getOccupied(), reason: `ผู้เล่น P${freeSlot + 1} ออกจากห้องแล้ว` });
           }
         });
       });
@@ -183,21 +202,21 @@ export class NetClient {
       peer.on('open', () => {
         const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
         this.conn = conn;
-        const onOpen = () => {
-          if (connected) return;
-          connected = true;
-          clearTimeout(timer);
-          this.role = 'guest';
-          this.code = code;
-          this.startPing();
-          this.emit({ type: 'joined', code, mode: 'p2p' });
-          resolve();
-        };
-        if (conn.open) onOpen(); else conn.on('open', onOpen);
         conn.on('data', (data) => {
           if (data?.type === 'error') {
             clearTimeout(timer);
             reject(new Error(data.message || 'เข้าห้องไม่สำเร็จ'));
+            return;
+          }
+          if (data?.type === 'welcome' && !connected) {
+            connected = true;
+            clearTimeout(timer);
+            this.role = 'guest';
+            this.mySlot = data.slot ?? 1;
+            this.code = code;
+            this.startPing();
+            this.emit({ type: 'joined', code, mode: 'p2p', slot: this.mySlot, cfg: data.cfg, occupied: data.occupied });
+            resolve();
             return;
           }
           this.handleIncoming(data);
@@ -212,7 +231,7 @@ export class NetClient {
           clearInterval(this.pingTimer);
           if (this.conn === conn) {
             this.conn = null;
-            this.emit({ type: 'peer-left', reason: 'หัวหน้าห้องออกจากห้องแล้ว' });
+            this.emit({ type: 'peer-left', slot: 0, reason: 'หัวหน้าห้องออกจากห้องแล้ว' });
           }
         });
       });
@@ -231,9 +250,16 @@ export class NetClient {
     });
   }
 
-  send(obj) {
+  send(obj, targetSlot = null) {
     if (this.mode === 'ws') {
       if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
+    } else if (this.role === 'host') {
+      if (targetSlot !== null) {
+        const c = this.conns.get(targetSlot);
+        if (c && c.open) c.send(obj);
+      } else {
+        this.conns.forEach((c) => { if (c && c.open) c.send(obj); });
+      }
     } else if (this.conn && this.conn.open) {
       this.conn.send(obj);
     }
@@ -252,12 +278,17 @@ export class NetClient {
       this.conn = null;
       try { c.close(); } catch { /* ignore */ }
     }
+    if (this.conns.size) {
+      this.conns.forEach((c) => { try { c.close(); } catch { /* ignore */ } });
+      this.conns.clear();
+    }
     if (this.peer) {
       const p = this.peer;
       this.peer = null;
       try { p.destroy(); } catch { /* ignore */ }
     }
     this.role = null;
+    this.mySlot = 0;
     this.code = '';
     this.pingMs = null;
   }

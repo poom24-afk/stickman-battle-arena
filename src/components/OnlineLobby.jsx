@@ -39,7 +39,7 @@ export default function OnlineLobby({ onCreate, onJoin, onBack, connecting, erro
 
         <section className="panel cut" style={{ '--c': 'var(--red)' }}>
           <h3>เข้าห้องเพื่อน (GUEST)</h3>
-          <p className="trait">คุณจะเป็น <b>PLAYER 2</b> ใช้ปุ่มชุด P1 (WASD + F/G/H/J/K/L) เล่นจากเครื่องของคุณได้เลย</p>
+          <p className="trait">เข้าห้อง 1v1 (2 คน) หรือ 2v2 (สูงสุด 4 คน P2–P4) ใช้ปุ่มฝั่งคุณจากเครื่องของคุณได้เลย</p>
           <form onSubmit={submitJoin} className="row" style={{ marginTop: 16, justifyContent: 'flex-start' }}>
             <input
               className="code-input"
