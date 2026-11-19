@@ -13,6 +13,11 @@ const spec = (n) => ACTS[n] || SKILLS[n];
 const OPEN = 1.35, CLASH_T = 4;
 const DOM_DUR = 4.1, BEAT_T0 = 1.15, BEAT_GAP = 0.38, BEAT_N = 7, PERFECT = 0.075, GOOD = 0.17;
 const CUT_DUR = 1.85;
+const AI_TUNING = {
+  easy:   { mash: 3.2, qte: 1.8, block: 0.14, parry: 0.0,  dom: 0.10, counter: 1.5, skill: 0.30, waitMin: 0.65, waitMax: 1.25, atkMin: 0.55, atkMax: 0.95, dodge: 0.15 },
+  medium: { mash: 7.0, qte: 5.0, block: 0.38, parry: 0.14, dom: 0.28, counter: 4.5, skill: 0.58, waitMin: 0.38, waitMax: 0.78, atkMin: 0.28, atkMax: 0.50, dodge: 0.45 },
+  hard:   { mash: 12.0, qte: 14.0, block: 0.78, parry: 0.35, dom: 0.65, counter: 10.0, skill: 0.88, waitMin: 0.12, waitMax: 0.32, atkMin: 0.14, atkMax: 0.28, dodge: 0.85 },
+};
 const WIN_QUOTES = {
   gojo: '天上天下唯我独尊 · ทั้งฟ้าและดิน มีเพียงข้าผู้ไร้เทียมทาน',
   sukuna: 'Stand proud. You were strong.',
@@ -52,6 +57,7 @@ export class Game {
     canvas.width = W; canvas.height = H;
     this.arena = ARENAS[cfg.arena] || ARENAS[0];
     this.is2v2 = cfg.mode === '2v2';
+    this.aiDiff = cfg.aiDiff || 'medium';
     this.worldW = this.is2v2 ? 2400 : W;
     this.stageL = this.is2v2 ? 180 : STAGE_L;
     this.stageR = this.is2v2 ? 2220 : STAGE_R;
@@ -280,26 +286,27 @@ export class Game {
   }
   aiInput(f, o, dt, can) {
     const inp = { _left: false, _right: false, _jump: false, _block: false };
+    const ai = AI_TUNING[this.aiDiff] || AI_TUNING.medium;
     f.aiAtkT = Math.max(0, (f.aiAtkT || 0) - dt);
     f.aiJumpT = Math.max(0, (f.aiJumpT || 0) - dt);
     if (this.dom?.st === 'clash' && (f.i === this.dom.clash?.f0 || f.i === this.dom.clash?.f1)) {
-      if (Math.random() < dt * 7) inp.dom = true;
+      if (Math.random() < dt * ai.mash) inp.dom = true;
       return inp;
     }
     if (f.ledge) {
-      if (Math.random() < dt * 7) inp.jump = true;
+      if (Math.random() < dt * ai.mash) inp.jump = true;
       return inp;
     }
     if (this.cutscene?.owner === f.i && this.cutscene.qte && !this.cutscene.qte.done && this.cutscene.t >= this.cutscene.qte.t0) {
-      if (Math.random() < dt * 5) inp.punch = true;
+      if (Math.random() < dt * ai.qte) inp.punch = true;
       return inp;
     }
     if (f.qte && !f.qte.done && f.qte.t >= f.qte.start) {
-      if (Math.random() < dt * 5) inp.punch = true;
+      if (Math.random() < dt * ai.qte) inp.punch = true;
       return inp;
     }
     if (!can || !o || f.ko) return inp;
-    if (this.dom?.st === 'open' && this.dom.ownerTeam !== f.team && f.ce >= 100 && Math.random() < dt * 4) {
+    if (this.dom?.st === 'open' && this.dom.ownerTeam !== f.team && f.ce >= 100 && Math.random() < dt * ai.counter) {
       inp.dom = true;
       return inp;
     }
@@ -309,13 +316,20 @@ export class Game {
     if (adx > 64) { if (dx > 0) inp._right = true; else inp._left = true; }
     else if (adx < 40) { if (dx > 0) inp._left = true; else inp._right = true; }
     if (dy < -65 && f.aiJumpT <= 0 && f.grounded) { inp.jump = true; inp._jump = true; f.aiJumpT = 0.7; }
-    if (o.act && adx < 130 && Math.abs(dy) < 90 && Math.random() < 0.35 && f.grounded) {
+    if (f.aiJumpT <= 0 && f.grounded && this.proj.some((p) => {
+      const pf = this.fighters[p.owner];
+      return pf && pf.team !== f.team && Math.abs(p.x - f.x) < 155 && Math.sign(p.vx) === Math.sign(f.x - p.x) && Math.abs(p.y - (f.y - 50)) < 75;
+    }) && Math.random() < ai.dodge) {
+      inp.jump = true; inp._jump = true; f.aiJumpT = 0.55;
+      return inp;
+    }
+    if (o.act && adx < 140 && Math.abs(dy) < 95 && Math.random() < ai.block && f.grounded) {
       inp._block = true;
-      if (Math.random() < dt * 4) inp.block = true;
+      if (Math.random() < dt * (ai.parry * 22)) inp.block = true;
       return inp;
     }
     if (f.aiAtkT <= 0) {
-      if (f.ce >= 100 && !this.dom && adx < 520 && Math.random() < 0.25) {
+      if (f.ce >= 100 && !this.dom && adx < 520 && Math.random() < ai.dom) {
         inp.dom = true; f.aiAtkT = 0.6;
       } else {
         const ready = [0, 1, 2].filter((s) => this.effectiveSkill(f, s) && f.cd[s] <= 0);
@@ -328,15 +342,15 @@ export class Game {
           if (sp.kind === 'melee' || sp.kind === 'cutmelee') return adx < (sp.reach || 100) + 45 && Math.abs(dy) < 95;
           return adx < 680;
         });
-        if (usable.length && Math.random() < 0.58) {
+        if (usable.length && Math.random() < ai.skill) {
           const pick = usable[(Math.random() * usable.length) | 0];
           inp['s' + (pick + 1)] = true;
-          f.aiAtkT = rnd(0.45, 0.85);
+          f.aiAtkT = rnd(ai.waitMin, ai.waitMax);
         } else if (adx < 85 && Math.abs(dy) < 85) {
           inp[Math.random() < 0.62 ? 'punch' : 'kick'] = true;
-          f.aiAtkT = rnd(0.28, 0.48);
+          f.aiAtkT = rnd(ai.atkMin, ai.atkMax);
         } else {
-          f.aiAtkT = 0.16;
+          f.aiAtkT = 0.14;
         }
       }
     }
@@ -2278,7 +2292,8 @@ export class Game {
       c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(at(hpw(f.hp)), 46, hpw(f.hp), 8);
       c.restore();
       this.pg(x - 4, 42, w + 8, 36, sk); c.strokeStyle = low ? `rgba(255,45,85,${0.6 + 0.4 * Math.sin(this.time * 12)})` : '#fff'; c.lineWidth = 3; c.stroke();
-      const tx = i ? x + w - 6 : x + 6, disp = f.ai ? `${f.name} [CPU]` : f.name; c.font = `24px ${FONT}`; const nw = c.measureText(disp).width;
+      const tx = i ? x + w - 6 : x + 6, dTag = { easy: 'EASY', medium: 'MED', hard: 'HARD' }[this.aiDiff] || 'CPU';
+      const disp = f.ai ? `${f.name} [CPU · ${dTag}]` : f.name; c.font = `24px ${FONT}`; const nw = c.measureText(disp).width;
       label(disp, tx, 26, 24, '#fff', i ? 'right' : 'left');
       if (f.jp) label(f.jp, tx + (i ? -(nw + 12) : nw + 12), 28, 15, f.color, i ? 'right' : 'left');
       for (let k = 0; k < T; k++) { const px = i ? x + 16 + k * 24 : x + w - 16 - k * 24; c.beginPath(); c.moveTo(px, 17); c.lineTo(px + 8, 26); c.lineTo(px, 35); c.lineTo(px - 8, 26); c.closePath(); if (k < wins) { c.fillStyle = f.color; c.fill(); } c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); }

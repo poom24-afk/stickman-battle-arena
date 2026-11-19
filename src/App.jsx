@@ -26,7 +26,7 @@ export default function App() {
   const [cfg, setCfg] = useState(() => {
     const [a, b] = [start('gojo'), start('sukuna')];
     return {
-      mode: '1v1', p2Ai: false,
+      mode: '1v1', p2Ai: false, aiDiff: 'medium',
       chars: [a.id, b.id], colors: [a.ch.color, b.ch.color], skins: ['default', 'default'],
       allies: ['yuji', 'mahito'],
       loadouts: [[...a.ch.skills], [...b.ch.skills]], domains: [a.ch.domain, b.ch.domain], arena: 1, target: 2,
@@ -249,7 +249,8 @@ export default function App() {
         <p className="tag">LOCAL & ONLINE ARENA · สู้กันได้ทั้งเครื่องเดียวและออนไลน์</p>
       </header>
       <div className="row menu-actions">
-        <button className="btn big" onClick={() => go('select')}>เล่น 2 คน (เครื่องเดียว)</button>
+        <button className="btn big" onClick={() => { setCfg((c) => ({ ...c, p2Ai: false })); go('select'); }}>เล่น 2 คน (เครื่องเดียว)</button>
+        <button className="btn big" style={{ background: 'var(--gold)', color: '#000' }} onClick={() => { setCfg((c) => ({ ...c, p2Ai: true })); go('select'); }}>🤖 เล่นกับบอท</button>
         <button className="btn big" style={{ background: 'var(--violet)' }} onClick={() => go('lobby')}>เล่นออนไลน์</button>
         <button className="btn big ghost" onClick={() => { unlockAudio(); sfx.click(); setSettingsProf('1v1'); }}>ตั้งปุ่ม</button>
       </div>

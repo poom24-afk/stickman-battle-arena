@@ -203,10 +203,11 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
   const isHost = online?.role === 'host';
   const myIdx = isGuest ? 1 : 0;
   const is2v2 = cfg.mode === '2v2';
+  const diffLabel = { easy: 'ง่าย', medium: 'ปานกลาง', hard: 'ยาก' }[cfg.aiDiff || 'medium'];
 
   return (
     <div className="screen select">
-      <h2 className="title sm">{online ? 'ห้องสู้ต่อสู้ออนไลน์' : 'เลือกนักสู้'}</h2>
+      <h2 className="title sm">{online ? 'ห้องสู้ต่อสู้ออนไลน์' : cfg.p2Ai ? `โหมดปะทะบอท (${diffLabel})` : 'เลือกนักสู้'}</h2>
       <div className="chips">
         {[['1v1', '⚔️ 1 vs 1 (สนามปกติ)'], ['2v2', '🔥 2 vs 2 (แมพใหญ่พิเศษ!)']].map(([m, lbl]) => (
           <button key={m} disabled={isGuest} className={'chip' + ((cfg.mode || '1v1') === m ? ' on' : '')}
@@ -214,12 +215,23 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
             {lbl}
           </button>
         ))}
-        {!online && is2v2 && (
+        {!online && (
           <button className={'chip' + (cfg.p2Ai ? ' on' : '')} onClick={() => setCfg((c) => ({ ...c, p2Ai: !c.p2Ai }))}>
-            {cfg.p2Ai ? '🤖 ฝั่งขวา: บอท 2 ตัว' : '👥 ฝั่งขวา: P2 + บอท'}
+            {cfg.p2Ai ? (is2v2 ? '🤖 ฝั่งขวา: บอท 2 ตัว' : '🤖 คู่ต่อสู้: บอท (CPU)') : (is2v2 ? '👥 ฝั่งขวา: P2 + บอท' : '👥 คู่ต่อสู้: P2 (2 คน)')}
           </button>
         )}
       </div>
+      {!online && (cfg.p2Ai || is2v2) && (
+        <div className="chips" role="group" aria-label="ระดับความยากบอท">
+          <span style={{ alignSelf: 'center', fontSize: 13, fontWeight: 700, opacity: 0.85 }}>ระดับบอท:</span>
+          {[['easy', '🌱 ง่าย'], ['medium', '⚡ ปานกลาง'], ['hard', '💀 ยาก']].map(([d, lbl]) => (
+            <button key={d} className={'chip' + ((cfg.aiDiff || 'medium') === d ? ' on' : '')}
+              onClick={() => setCfg((c) => ({ ...c, aiDiff: d }))}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      )}
       {online && (
         <div className="online-bar">
           <span>รหัสห้อง:</span>
@@ -239,7 +251,7 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
         <span className="vs" aria-hidden="true">VS</span>
         <Panel i={1} cfg={cfg} setCfg={setCfg}
           locked={!!online && myIdx !== 1}
-          badge={online ? (myIdx === 1 ? 'คุณ (GUEST)' : 'คู่ต่อสู้ (GUEST)') : ''} />
+          badge={online ? (myIdx === 1 ? 'คุณ (GUEST)' : 'คู่ต่อสู้ (GUEST)') : (cfg.p2Ai ? `บอท · ${diffLabel}` : '')} />
       </div>
       <h3 className="sub">สนามต่อสู้ {isGuest ? '(หัวหน้าห้องเป็นคนเลือก)' : ''}</h3>
       <div className="arenas">
