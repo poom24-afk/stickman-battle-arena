@@ -66,5 +66,7 @@ export const sfx = {
   art: () => { tone(200, 900, 0.3, 'sawtooth', 0.14); noise(0.25, 0.18); },
   gavel: () => { tone(110, 40, 0.25, 'square', 0.25); noise(0.2, 0.3); },
   resist: () => tone(400, 300, 0.05, 'triangle', 0.06),
+  wheel: () => { tone(520, 1040, 0.14, 'triangle', 0.16); tone(1280, 1560, 0.22, 'sine', 0.1); noise(0.06, 0.1); },
+  victory: () => { tone(110, 55, 0.6, 'sawtooth', 0.18); tone(440, 660, 0.45, 'triangle', 0.15); setTimeout(() => { tone(554, 880, 0.55, 'triangle', 0.16); tone(880, 1320, 0.6, 'sine', 0.12); }, 180); },
   ko: () => { tone(400, 60, 0.8, 'sawtooth', 0.2); noise(0.5, 0.2); },
 };

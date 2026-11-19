@@ -13,6 +13,27 @@ const spec = (n) => ACTS[n] || SKILLS[n];
 const OPEN = 1.35, CLASH_T = 4;
 const DOM_DUR = 4.1, BEAT_T0 = 1.15, BEAT_GAP = 0.38, BEAT_N = 7, PERFECT = 0.075, GOOD = 0.17;
 const CUT_DUR = 1.85;
+const WIN_QUOTES = {
+  gojo: '天上天下唯我独尊 · ทั้งฟ้าและดิน มีเพียงข้าผู้ไร้เทียมทาน',
+  sukuna: 'Stand proud. You were strong.',
+  yuji: 'ฉันจะไม่แพ้... เพื่อปกป้องทุกคน!',
+  megumi: 'จงสยายปีกออก... เงาทั้งสิบอยู่ในกำมือแล้ว',
+  mahoraga: 'กงล้อธรรมจักรหมุนครบรอบ · ไม่มีอาคมใดหยุดข้าได้!',
+  nobara: 'ความงามและความแข็งแกร่ง ไม่มีคำว่าปราณี!',
+  nanami: 'งานล่วงเวลาจบลงแล้ว · ได้เวลาเลิกงาน',
+  maki: 'ต่อให้ไร้พลังคำสาป ฉันก็จะฟันผ่านทุกอย่าง!',
+  toji: 'พวกนักไสยเวท... ก็แค่นั้นแหละ',
+  toge: 'โอคากะ! · คำสาปเสียงสัมฤทธิ์ผล',
+  todo: 'MY BESTO FRIENDO! การต่อสู้ที่เร่าร้อนที่สุด!',
+  yuta: 'นี่แหละ... พลังแห่งรักแท้ของพวกเรา',
+  mahito: 'วิญญาณของแก... แตกสลายคามือฉันแล้ว!',
+  jogo: 'เปลวเพลิงภัยพิบัติ จะเผาผลาญทุกสรรพสิ่ง!',
+  hakari: 'FEVER TIME 777! ดวงของฉันไม่มีวันหมด!',
+  choso: 'สายเลือดพี่น้อง... จะไม่มีวันขาดสะบั้น',
+  higuruma: 'ศาลตัดสินแล้ว... มีความผิดสถานหนัก!',
+  dagon: 'คลื่นทะเลลึกแห่งภัยพิบัติกลืนกินหมดแล้ว!',
+  geto: 'วิญญาณคำสาปทั้งหมด จงสยบแทบเท้าข้า',
+};
 const NAMES = ['head', 'neck', 'hip', 'kF', 'kB', 'fF', 'fB', 'eF', 'eB', 'hF', 'hB'];
 const BONES = [['neck', 'head', 17], ['neck', 'hip', 40], ['hip', 'kF', 32], ['kF', 'fF', 32], ['hip', 'kB', 32], ['kB', 'fB', 32],
   ['neck', 'eF', 30], ['eF', 'hF', 30], ['neck', 'eB', 30], ['eB', 'hB', 30]];
@@ -63,9 +84,10 @@ export class Game {
       const skinList = (chId && SKINS[chId]) || [];
       const skin = skinList.find((s) => s.id === (skinId || 'default')) || skinList[0] || null;
       return {
-        i, team, ai, tag, color: color || ch?.color || '#fff',
+        i, team, ai, tag, chId, color: color || ch?.color || '#fff',
         skills: load || ch?.skills || ['punch', 'kick', 'punch'], dom: domId || ch?.domain || 'void',
         wins: 0, rig: null, rag: 0, lastAfter: 0, aiAtkT: 0, aiJumpT: 0,
+        mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1,
         ch, pas: ch ? ch.pas : {}, name: ch ? ch.name : `PLAYER ${i + 1}`, jp: ch ? ch.jp : '', skin, gear: skin?.gear || null,
       };
     };
@@ -142,17 +164,41 @@ export class Game {
       Object.assign(f, {
         x: spawns[f.i] ?? (f.team ? 900 : 380), y: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
         parryT: 0, parryCd: 0, dropT: 0, dropCool: 0, climbing: false, floorY: GROUND, ragdollT: 0, ledge: null, ledgeCd: 0,
-        aiAtkT: rnd(0.2, 0.5), aiJumpT: 0,
+        aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1,
         cd: [0, 0, 0], amp: 0, ampMul: 1, ampSpd: 1, ce: f.ce > 0 && this.round > 1 ? Math.min(60, f.ce) : 0, combo: 0, comboT: 0, flash: 0, anim: 0, grounded: true, ghost: false, ko: false, rag: 0, aura: 0, auraC: '#fff',
       });
       const T = this.targets(f, this.pose(f)); f.rig = {};
       NAMES.forEach((n) => (f.rig[n] = { x: T[n].x, y: T[n].y, ox: T[n].x, oy: T[n].y }));
     });
-    this.phase = 'countdown'; this.phaseT = 3; this.cnt = 4; this.timer = 99; this.msg = ''; this.dom = null; this.cutscene = null;
+    this.phase = 'countdown'; this.phaseT = 3; this.cnt = 4; this.timer = 99; this.msg = ''; this.dom = null; this.cutscene = null; this.victory = null;
     this.parts = []; this.proj = []; this.rings = []; this.beams = []; this.slashes = []; this.arcs = []; this.orbs = []; this.zaps = [];
     this.pillars = []; this.texts = []; this.afters = []; this.warns = []; this.sched = []; this.flash = null;
   }
   later(t, fn) { this.sched.push({ t, fn }); }
+  effectiveSkill(f, idx) {
+    const id = f.skills[idx];
+    return f.mahoraga > 0 && id === 'summon_mahoraga' ? (SKILLS[id]?.altSkill || 'mahoraga') : id;
+  }
+  adaptHit(def, srcKey, rawDmg) {
+    if (!def || def.mahoraga <= 0 || !srcKey) return rawDmg;
+    const lv = def.adapt?.[srcKey] || 0;
+    const curMul = Math.max(0.15, Math.pow(0.7, lv));
+    const nextLv = lv + 1;
+    def.adapt[srcKey] = nextLv;
+    const nextMul = Math.max(0.15, Math.pow(0.7, nextLv));
+    if ((def.adaptSpin || 0) <= 0.08) {
+      def.adaptSpin = 0.48;
+      this.sfx.wheel();
+      this.ring(def.x, def.y - 95, 115, '#ffd54f');
+      this.spark(def.x, def.y - 135, 12, '#ffd54f', 240, 0.45, 4, 0);
+      const pct = Math.round(nextMul * 100);
+      this.texts.push({
+        txt: pct <= 15 ? 'ADAPTED MAX! (15% DMG)' : `ADAPT x${nextLv} (${pct}% DMG)`,
+        x: def.x, y: def.y - 178, t: 0.78, max: 0.78, color: '#ffd54f', size: 22,
+      });
+    }
+    return rawDmg * curMul;
+  }
   surfaceBelow(x, y) {
     let best = x > this.stageL && x < this.stageR && y <= GROUND + 6 ? GROUND : null;
     for (const p of this.platforms) {
@@ -178,6 +224,19 @@ export class Game {
     return { ability: DOMAINS[d.id].ability, isOwner: (d.ownerTeam ?? (this.fighters[d.owner]?.team)) === f.team, dom: d };
   }
   updateCamera(dt) {
+    if (this.victory) {
+      const wf = this.fighters[this.victory.idx];
+      if (wf) {
+        const tz = 1.38;
+        const tx = clamp(wf.x, W / (2 * tz) - 60, Math.max(W / (2 * tz) - 60, this.worldW - W / (2 * tz) + 60));
+        const ty = clamp(wf.y - 72, H / (2 * tz) - 30, H + 40 - H / (2 * tz));
+        const k = Math.min(1, dt * 6.5);
+        this.cam.z += (tz - this.cam.z) * k;
+        this.cam.x += (tx - this.cam.x) * k;
+        this.cam.y += (ty - this.cam.y) * k;
+        return;
+      }
+    }
     if (!this.is2v2) { this.cam.x = W / 2; this.cam.y = H / 2; this.cam.z = 1; return; }
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     if (this.cutscene) {
@@ -217,6 +276,14 @@ export class Game {
       if (Math.random() < dt * 7) inp.jump = true;
       return inp;
     }
+    if (this.cutscene?.owner === f.i && this.cutscene.qte && !this.cutscene.qte.done && this.cutscene.t >= this.cutscene.qte.t0) {
+      if (Math.random() < dt * 5) inp.punch = true;
+      return inp;
+    }
+    if (f.qte && !f.qte.done && f.qte.t >= f.qte.start) {
+      if (Math.random() < dt * 5) inp.punch = true;
+      return inp;
+    }
     if (!can || !o || f.ko) return inp;
     if (this.dom?.st === 'open' && this.dom.ownerTeam !== f.team && f.ce >= 100 && Math.random() < dt * 4) {
       inp.dom = true;
@@ -237,11 +304,12 @@ export class Game {
       if (f.ce >= 100 && !this.dom && adx < 520 && Math.random() < 0.25) {
         inp.dom = true; f.aiAtkT = 0.6;
       } else {
-        const ready = [0, 1, 2].filter((s) => f.skills[s] && f.cd[s] <= 0);
+        const ready = [0, 1, 2].filter((s) => this.effectiveSkill(f, s) && f.cd[s] <= 0);
         const usable = ready.filter((s) => {
-          const sp = spec(f.skills[s]);
+          const sp = spec(this.effectiveSkill(f, s));
           if (!sp) return false;
           if (sp.kind === 'heal') return f.hp < 72;
+          if (sp.kind === 'morph') return f.mahoraga <= 0;
           if (sp.kind === 'buff' || sp.kind === 'amp' || sp.kind === 'jackpot') return adx < 340;
           if (sp.kind === 'melee' || sp.kind === 'cutmelee') return adx < (sp.reach || 100) + 45 && Math.abs(dy) < 95;
           return adx < 680;
@@ -294,7 +362,7 @@ export class Game {
     this.net.send({
       type: 'state',
       round: this.round, phase: this.phase, phaseT: this.phaseT, cnt: this.cnt, timer: this.timer,
-      banner: this.banner, label: this.label, msg: this.msg, matchWinner: this.matchWinner, wins: this.wins,
+      banner: this.banner, label: this.label, msg: this.msg, matchWinner: this.matchWinner, wins: this.wins, victory: this.victory,
       fighters: this.fighters.map((f) => ({
         x: Math.round(f.x * 10) / 10, y: Math.round(f.y * 10) / 10, vx: Math.round(f.vx), vy: Math.round(f.vy),
         face: f.face, hp: Math.round(f.hp * 10) / 10, ce: Math.round(f.ce * 10) / 10,
@@ -304,10 +372,12 @@ export class Game {
         blocking: f.blocking, parryT: Math.round(f.parryT * 100) / 100, climbing: f.climbing,
         ragdollT: Math.round(f.ragdollT * 100) / 100, ko: f.ko, grounded: f.grounded, ghost: f.ghost,
         wins: f.wins, anim: f.anim, act: f.act, ledge: f.ledge,
+        mahoraga: Math.round((f.mahoraga || 0) * 10) / 10, adaptSpin: Math.round((f.adaptSpin || 0) * 100) / 100,
+        qte: f.qte, adaptN: Object.keys(f.adapt || {}).length,
       })),
       proj: this.proj, orbs: this.orbs, beams: this.beams, warns: this.warns,
       dom: this.dom ? { ...this.dom, ticks: undefined } : null,
-      cutscene: this.cutscene ? { owner: this.cutscene.owner, target: this.cutscene.target, name: this.cutscene.name, t: this.cutscene.t, dur: this.cutscene.dur, step: this.cutscene.step } : null,
+      cutscene: this.cutscene ? { owner: this.cutscene.owner, target: this.cutscene.target, name: this.cutscene.name, t: this.cutscene.t, dur: this.cutscene.dur, step: this.cutscene.step, qte: this.cutscene.qte } : null,
       ev: this.netEvents.splice(0),
     });
   }
@@ -319,6 +389,7 @@ export class Game {
     }
     this.phase = s.phase; this.phaseT = s.phaseT; this.cnt = s.cnt; this.timer = s.timer;
     this.banner = s.banner; this.label = s.label; this.msg = s.msg; this.matchWinner = s.matchWinner;
+    this.victory = s.victory || null;
     if (s.wins) this.wins = s.wins;
     s.fighters.forEach((sf, i) => {
       const f = this.fighters[i];
@@ -330,6 +401,7 @@ export class Game {
         aura: sf.aura, auraC: sf.auraC, combo: sf.combo, comboT: sf.comboT, stun: sf.stun, inv: sf.inv, flash: sf.flash,
         blocking: sf.blocking, parryT: sf.parryT, climbing: sf.climbing, ragdollT: sf.ragdollT, ko: sf.ko,
         grounded: sf.grounded, ghost: sf.ghost, wins: sf.wins, anim: sf.anim, act: sf.act, ledge: sf.ledge,
+        mahoraga: sf.mahoraga || 0, adaptSpin: sf.adaptSpin || 0, qte: sf.qte || null, adaptN: sf.adaptN || 0,
       });
     });
     this.proj = s.proj || []; this.orbs = s.orbs || []; this.beams = s.beams || []; this.warns = s.warns || [];
@@ -372,6 +444,7 @@ export class Game {
       this.sendGuestInput();
       if (this.paused) return;
       this.time += dt; this.shake = Math.max(0, this.shake - dt * 40); this.banner = Math.max(0, this.banner - dt);
+      if (this.victory) this.victory.t += dt;
       this.proj.forEach((p) => { p.x += p.vx * dt; });
       this.fighters.forEach((f) => { if (!f.ledge && !this.cutscene) f.x = clamp(f.x + f.vx * dt, -250, this.worldW + 250); });
       this.stepFx(dt);
@@ -395,10 +468,19 @@ export class Game {
           this.endRound(hp0 > hp1 ? 0 : hp1 > hp0 ? 1 : -1, 'TIME UP');
         }
       }
-    } else if (this.phase === 'ko' && this.phaseT <= 0) {
-      if (this.matchWinner !== null) {
-        if (!this.reported) { this.reported = true; this.over = true; this.cb.onEnd?.({ winner: this.matchWinner, scores: [...this.wins] }); }
-      } else { this.round++; this.resetRound(); }
+    } else if (this.phase === 'ko') {
+      if (this.victory) {
+        this.victory.t += dt;
+        const wf = this.fighters[this.victory.idx];
+        if (wf && Math.random() < 0.45) {
+          this.spark(wf.x + rnd(-45, 45), wf.y - rnd(20, 140), 1, this.victory.color, 130, 0.55, 4, -80);
+        }
+      }
+      if (this.phaseT <= 0) {
+        if (this.matchWinner !== null) {
+          if (!this.reported) { this.reported = true; this.over = true; this.cb.onEnd?.({ winner: this.matchWinner, scores: [...this.wins] }); }
+        } else { this.round++; this.resetRound(); }
+      }
     }
     const can = this.phase === 'fight' && (!this.dom || this.dom.st === 'linger') && !this.cutscene;
     for (const f of this.fighters) this.step(f, this.nearestEnemy(f), dt, can);
@@ -424,10 +506,10 @@ export class Game {
       const att = this.fighters[p.owner];
       const t = att ? this.enemiesOf(att).find((e) => !e.ghost && !e.ko && Math.abs(p.x - e.x) < p.r + 18 && p.y > e.y - 130 - p.r && p.y < e.y + p.r) : null;
       if (can && t) {
-        const ok = this.hit(att, t, { dmg: p.dmg, kb: p.kb, stun: p.stun, vy: p.vy, big: !p.small, color: p.color });
+        const ok = this.hit(att, t, { dmg: p.dmg, kb: p.kb, stun: p.stun, vy: p.vy, big: !p.small, color: p.color, src: p.src || p.kind || 'proj' });
         if (p.echo && ok === true) this.later(p.echo, () => {
           if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || t.ko) return;
-          t.inv = 0; this.hit(att, t, { dmg: p.dmg2, kb: p.kb2, stun: 0.5, vy: 300, big: true, color: p.color });
+          t.inv = 0; this.hit(att, t, { dmg: p.dmg2, kb: p.kb2, stun: 0.5, vy: 300, big: true, color: p.color, src: p.src || 'resonance' });
           this.ring(t.x, t.y - 80, 140, p.color); this.texts.push({ txt: 'RESONANCE!', x: t.x, y: t.y - 150, t: 0.7, max: 0.7, color: p.color, size: 38 });
         });
         if (p.boom) { this.ring(p.x, p.y, p.boom * 1.7, p.color); this.ring(p.x, p.y, p.boom, '#fff'); this.spark(p.x, p.y, 36, p.color, 450, 0.7, 7, 300); this.shake = Math.max(this.shake, p.boom > 150 ? 20 : 12); this.sfx.boom(); }
@@ -460,15 +542,35 @@ export class Game {
     }
   }
   endRound(w, label) {
-    this.phase = 'ko'; this.phaseT = 2.6; this.label = label; this.dom = null; this.cutscene = null;
+    this.phase = 'ko'; this.phaseT = w >= 0 ? 3.2 : 2.4; this.label = label; this.dom = null; this.cutscene = null;
+    this.fighters.forEach((f) => { f.act = null; f.qte = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null; f.ragdollT = 0; f.stun = Math.max(f.stun, 0.5); });
     if (w >= 0) {
       this.wins[w]++;
       this.fighters.forEach((f) => { if (f.team === w) f.wins = this.wins[w]; else f.ko = true; });
       if (this.wins[w] >= this.cfg.target) this.matchWinner = w;
-    } else this.fighters.forEach((f) => (f.ko = true));
+      const wf = this.fighters.find((f) => f.team === w && !f.ko) || this.fighters[w];
+      if (wf) {
+        wf.stun = 0; wf.ragdollT = 0; wf.inv = 9; wf.vx = 0; wf.vy = Math.min(wf.vy, 0);
+        if (wf.y > GROUND + 20) { wf.x = clamp(wf.x, this.stageL + 60, this.stageR - 60); wf.y = GROUND; wf.grounded = true; }
+        const col = wf.mahoraga > 0 ? '#ffd54f' : wf.color;
+        const line = wf.mahoraga > 0 ? WIN_QUOTES.mahoraga : (WIN_QUOTES[wf.chId] || 'THE BATTLE IS DECIDED!');
+        this.victory = {
+          team: w, idx: wf.i, t: 0, dur: 3.2, label, color: col,
+          name: wf.mahoraga > 0 ? 'MAHORAGA' : wf.name, jp: wf.mahoraga > 0 ? '八握剣・魔虚羅' : (wf.jp || ''),
+          sub: this.is2v2 ? `TEAM ${w ? 'B' : 'A'} VICTORY` : (this.wins[w] >= this.cfg.target ? 'FINAL VICTORY' : `ROUND ${this.round} WINNER`),
+          line,
+        };
+        this.ring(wf.x, wf.y - 80, 320, col); this.ring(wf.x, wf.y - 80, 180, '#fff');
+        this.spark(wf.x, wf.y - 80, 38, col, 480, 0.75, 6, 120);
+        this.flash = { t: 0.28, max: 0.28, c: '#fff' };
+        this.sfx.victory();
+      }
+    } else {
+      this.fighters.forEach((f) => (f.ko = true));
+      this.victory = null;
+    }
     this.msg = w >= 0 ? `${this.is2v2 ? `TEAM ${w ? 'B' : 'A'}` : `PLAYER ${w + 1}`} WINS ROUND ${this.round}` : 'DRAW - REPLAY';
-    this.shake = 16; this.freeze = 0.12; this.sfx.ko();
-    this.fighters.forEach((f) => { f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null; f.ragdollT = 0; f.stun = Math.max(f.stun, 0.5); });
+    this.shake = 18; this.freeze = 0.14; this.sfx.ko();
   }
   step(f, o, dt, can) {
     const c = this.controls[f.i % 2];
@@ -487,6 +589,31 @@ export class Game {
       for (const k in c) { const d = c[k].some((x) => this.keys.has(x)); inp[k] = d && !this.prev[f.i][k]; this.prev[f.i][k] = d; inp['_' + k] = d; }
     }
     f.inp = inp; f.aura = Math.max(0, f.aura - dt);
+    const wasMorph = f.mahoraga > 0;
+    f.mahoraga = Math.max(0, (f.mahoraga || 0) - dt);
+    f.adaptSpin = Math.max(0, (f.adaptSpin || 0) - dt);
+    if (wasMorph && f.mahoraga <= 0) {
+      f.cd = f.cd.map((v, idx) => (f.skills[idx] === 'summon_mahoraga' ? Math.min(v, 8) : v));
+      this.texts.push({ txt: 'MAHORAGA DISMISSED', x: f.x, y: f.y - 160, t: 0.85, max: 0.85, color: '#c46bff', size: 24 });
+    }
+    if (f.qte) {
+      f.qte.t += dt;
+      if (!f.qte.done && f.act && can && (inp.punch || inp.kick || inp.s1 || inp.s2 || inp.s3)) {
+        if (f.qte.t >= f.qte.start && f.qte.t <= f.qte.end) {
+          f.qte.done = true; f.qte.ok = true; f.qteMul = f.qte.mul;
+          this.sfx.perfect(); this.ring(f.x, f.y - 80, 125, '#ffd24a');
+          this.spark(f.x, f.y - 80, 18, '#ffd24a', 260, 0.4, 5, 0);
+          this.texts.push({ txt: `QTE BOOST ×${f.qte.mul}!`, x: f.x, y: f.y - 175, t: 0.75, max: 0.75, color: '#ffd24a', size: 30 });
+        } else {
+          f.qte.done = true; f.qte.ok = false; f.qteMul = 1;
+          this.sfx.miss(); this.texts.push({ txt: 'QTE MISS', x: f.x, y: f.y - 165, t: 0.55, max: 0.55, color: '#9e9e9e', size: 22 });
+        }
+      }
+      if (!f.act || f.qte.t >= f.qte.dur) {
+        if (!f.qte.done) f.qte.done = true;
+        if (!f.act) f.qte = null;
+      }
+    }
     const da = this.domAbility(f);
     const cdRate = da ? (da.ability === 'shadow' && da.isOwner ? 2.0 : da.ability === 'slow' && !da.isOwner ? 0.5 : 1) : 1;
     f.cd = f.cd.map((v) => Math.max(0, v - dt * cdRate));
@@ -560,18 +687,20 @@ export class Game {
       else if (inp._block) { f.vy = 290; f.anim += dt * 1.6; f.dropT = 0.18; f.grounded = false; }
       else f.vy = 0;
       const si = ['s1', 's2', 's3'].findIndex((k) => inp[k]);
+      const effSk = si >= 0 ? this.effectiveSkill(f, si) : null;
       if (inp.punch) this.begin(f, o, 'punch');
       else if (inp.kick) this.begin(f, o, 'kick');
-      else if (si >= 0 && f.skills[si] && f.cd[si] <= 0) { this.begin(f, o, f.skills[si]); f.cd[si] = SKILLS[f.skills[si]].cd * (f.pas.cd || 1); }
+      else if (effSk && f.cd[si] <= 0) { this.begin(f, o, effSk); f.cd[si] = SKILLS[effSk].cd * (f.pas.cd || 1); }
       else if (inp.dom && f.ce >= 100) this.startDomain(f, o);
     } else if (can && !busy && !f.ko && !f.blocking) {
       const dir = (inp._right ? 1 : 0) - (inp._left ? 1 : 0);
-      f.vx = dir * 320 * (f.pas.speed || 1) * (f.amp > 0 ? f.ampSpd : 1) * domSpd; if (dir) f.anim += dt;
+      f.vx = dir * 320 * (f.pas.speed || 1) * (f.mahoraga > 0 ? 1.15 : 1) * (f.amp > 0 ? f.ampSpd : 1) * domSpd; if (dir) f.anim += dt;
       if (inp.jump && f.grounded && !dropped) { f.vy = -840; f.grounded = false; this.sfx.jump(); this.dust(f); }
       const si = ['s1', 's2', 's3'].findIndex((k) => inp[k]);
+      const effSk = si >= 0 ? this.effectiveSkill(f, si) : null;
       if (inp.punch) this.begin(f, o, 'punch');
       else if (inp.kick) this.begin(f, o, 'kick');
-      else if (si >= 0 && f.skills[si] && f.cd[si] <= 0) { this.begin(f, o, f.skills[si]); f.cd[si] = SKILLS[f.skills[si]].cd * (f.pas.cd || 1); }
+      else if (effSk && f.cd[si] <= 0) { this.begin(f, o, effSk); f.cd[si] = SKILLS[effSk].cd * (f.pas.cd || 1); }
       else if (inp.dom && f.ce >= 100) this.startDomain(f, o);
     } else if (f.act) {
       if (f.act.name !== 'domain') f.vx *= Math.exp(-10 * dt);
@@ -628,11 +757,14 @@ export class Game {
   }
   begin(f, o, name) {
     const sp = spec(name); f.act = { name, t: 0, hit: false, fired: false, arc: false }; f.climbing = false; f.parryT = 0;
+    f.qteMul = 1;
+    f.qte = sp.qte ? { t: 0, start: sp.qte.t0, end: sp.qte.t1, dur: sp.qte.dur, mul: sp.qte.mul || 1.4, done: false, ok: false } : null;
     if (sp.lunge) f.vx = f.face * sp.lunge;
     if (name === 'kick') this.sfx.kick(); else if (sp.kind === 'melee' || sp.kind === 'cutmelee') this.sfx.punch(); else this.sfx.charge();
   }
   actUpdate(f, o, dt) {
     const a = f.act, sp = spec(a.name), col = sp.color || f.color, can = this.phase === 'fight' && (!this.dom || this.dom.st === 'linger') && !this.cutscene; a.t += dt;
+    const qm = f.qteMul || 1;
     if (sp.kind === 'melee' || sp.kind === 'cutmelee') {
       if (!a.arc && a.t >= sp.win[0]) {
         a.arc = true;
@@ -656,10 +788,10 @@ export class Game {
             this.startCutscene(f, tgt, sp, a.name);
             return;
           }
-          const ok = this.hit(f, tgt, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, vy: a.name === 'kick' ? 330 : undefined, big: sp.dmg >= 9, color: col, fx: sp.fx, ragdoll: sp.ragdoll, basic: a.name === 'punch' || a.name === 'kick' });
+          const ok = this.hit(f, tgt, { dmg: sp.dmg * qm, kb: sp.kb * (qm > 1 ? 1.15 : 1), stun: sp.stun, vy: a.name === 'kick' ? 330 : undefined, big: sp.dmg >= 9 || qm > 1, color: qm > 1 ? '#ffd24a' : col, fx: sp.fx, ragdoll: sp.ragdoll, basic: a.name === 'punch' || a.name === 'kick', src: a.name });
           if (sp.delay && ok === true) this.later(sp.delay, () => {
             if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || tgt.ko) return;
-            tgt.inv = 0; this.hit(f, tgt, { dmg: sp.dmg2, kb: sp.kb2, stun: 0.65, vy: 430, big: true, ragdoll: 0.85, color: col });
+            tgt.inv = 0; this.hit(f, tgt, { dmg: sp.dmg2 * qm, kb: sp.kb2, stun: 0.65, vy: 430, big: true, ragdoll: 0.85, color: col, src: a.name });
             this.ring(tgt.x, tgt.y - 80, 130, col); this.texts.push({ txt: 'IMPACT!', x: tgt.x, y: tgt.y - 150, t: 0.7, max: 0.7, color: col, size: 40 });
           });
         }
@@ -672,7 +804,7 @@ export class Game {
           const tgt = this.enemiesOf(f).find((e) => !e.ko && Math.abs(e.x - f.x) <= sp.range && Math.abs(e.y - f.y) <= 260);
           if (tgt && (tgt.parryT > 0 || tgt.blocking)) {
             this.ring(f.x + f.face * 50, f.y - 80, 220, col);
-            this.hit(f, tgt, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, vy: 450, big: true, color: col });
+            this.hit(f, tgt, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, vy: 450, big: true, color: col, src: a.name });
           } else if (tgt && tgt.inv <= 0 && !tgt.ko) {
             this.startCutscene(f, tgt, sp, a.name);
             return;
@@ -682,31 +814,31 @@ export class Game {
         }
       }
     } else if (sp.kind !== 'domain') {
-      if ((sp.charge || sp.kind === 'heal' || sp.kind === 'buff' || sp.kind === 'amp') && a.t < sp.fireAt) this.spark(f.x + f.face * 50 + rnd(-40, 40), f.y - 85 + rnd(-40, 40), 1, col, 50, 0.3, 4, 0);
+      if ((sp.charge || sp.kind === 'heal' || sp.kind === 'buff' || sp.kind === 'amp' || sp.kind === 'morph') && a.t < sp.fireAt) this.spark(f.x + f.face * 50 + rnd(-40, 40), f.y - 85 + rnd(-40, 40), 1, col, 50, 0.3, 4, 0);
       if (!a.fired && a.t >= sp.fireAt) { a.fired = true; if (can) this.fire(f, o, a.name, sp); }
     }
-    if (a.t >= sp.dur) f.act = null;
+    if (a.t >= sp.dur) { f.act = null; f.qte = null; f.qteMul = 1; }
   }
   fire(f, o, name, sp) {
-    const col = sp.color, x0 = f.x + f.face * 35, y0 = f.y - 80;
+    const col = sp.color, x0 = f.x + f.face * 35, y0 = f.y - 80, qm = f.qteMul || 1;
     if (sp.kind === 'proj') {
       for (let i = 0; i < (sp.n || 1); i++) {
         const shot = () => {
           if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || f.stun > 0 || f.ko) return;
-          this.shoot(f, sp, { kind: 'orb', y: f.y - 80 + (sp.offs ? sp.offs[i % sp.offs.length] : 0) });
+          this.shoot(f, sp, { kind: 'orb', src: name, dmg: sp.dmg * qm, dmg2: sp.dmg2 ? sp.dmg2 * qm : undefined, y: f.y - 80 + (sp.offs ? sp.offs[i % sp.offs.length] : 0) });
           this.sfx.shoot(); this.ring(f.x + f.face * 35, f.y - 80, 70, col);
         };
         if (i === 0) shot(); else this.later(i * sp.gap, shot);
       }
     }
     else if (sp.kind === 'dogs') {
-      this.sfx.howl(); [0, 0.18].forEach((d, i) => this.later(d, () => this.proj.push({ x: f.x + f.face * 30, y: f.y - 24, vx: f.face * (i ? 840 : 620), owner: f.i, color: col, life: 1.7, r: 30, dmg: sp.dmg, kb: sp.kb, stun: sp.stun, kind: 'dog', face: f.face })));
+      this.sfx.howl(); [0, 0.18].forEach((d, i) => this.later(d, () => this.proj.push({ x: f.x + f.face * 30, y: f.y - 24, vx: f.face * (i ? 840 : 620), owner: f.i, src: name, color: col, life: 1.7, r: 30, dmg: sp.dmg * qm, kb: sp.kb, stun: sp.stun, kind: 'dog', face: f.face })));
     } else if (sp.kind === 'beam') {
-      this.beams.push({ x: x0, y: y0, d: f.face, th: sp.th, t: sp.vis, max: sp.vis, color: col, name, style: sp.style }); this.sfx.beam();
-      this.ring(x0, y0, sp.th + 80, col); this.shake = Math.max(this.shake, sp.th > 50 ? 24 : 9); if (sp.th > 50) this.flash = { t: 0.2, max: 0.2, c: '#e1bee7' };
+      this.beams.push({ x: x0, y: y0, d: f.face, th: sp.th * (qm > 1 ? 1.15 : 1), t: sp.vis, max: sp.vis, color: col, name, style: sp.style }); this.sfx.beam();
+      this.ring(x0, y0, sp.th + 80, col); this.shake = Math.max(this.shake, sp.th > 50 ? 24 : 9); if (sp.th > 50) this.flash = { t: 0.2, max: 0.2, c: qm > 1 ? '#ffd24a' : '#e1bee7' };
       this.enemiesOf(f).forEach((t) => {
         if (!t.ko && !t.ghost && t.y - 130 < y0 + sp.th / 2 && t.y > y0 - sp.th / 2 && (t.x - x0) * f.face > -20) {
-          this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, vy: sp.vy || 300, big: true, color: col });
+          this.hit(f, t, { dmg: sp.dmg * qm, kb: sp.kb, stun: sp.stun, vy: sp.vy || 300, big: true, color: col, src: name });
         }
       });
     } else if (sp.kind === 'slashes') {
@@ -717,33 +849,51 @@ export class Game {
       });
       this.enemiesOf(f).forEach((t) => {
         if (!t.ko && !t.ghost && (t.x - x1) * f.face > -20 && (t.x - x2) * f.face < 20) {
-          this.later(0.08, () => this.phase === 'fight' && !this.cutscene && !t.ko && this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: true, color: col }));
+          this.later(0.08, () => this.phase === 'fight' && !this.cutscene && !t.ko && this.hit(f, t, { dmg: sp.dmg * qm, kb: sp.kb, stun: sp.stun, big: true, color: col, src: name }));
         }
       });
     } else if (sp.kind === 'blue') {
-      this.sfx.blue(); this.orbs.push({ x: f.x + f.face * 150, y: f.y - 70, t: 0, hold: sp.hold, owner: f.i, color: col, tick: 0.2, dmg: sp.dmg, kb: sp.kb });
+      this.sfx.blue(); this.orbs.push({ x: f.x + f.face * 150, y: f.y - 70, t: 0, hold: sp.hold, owner: f.i, src: name, color: col, tick: 0.2, dmg: sp.dmg * qm, kb: sp.kb });
     } else if (sp.kind === 'warp') {
       this.sfx.warp(); this.ring(f.x, f.y - 70, 110, col);
       const t = o;
       if (!t || t.inv > 0 || t.ko || t.ghost) return;
       if (t.parryT > 0 || t.blocking) {
         this.ring(t.x, t.y - 70, 110, '#4fc3f7');
-        this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col });
+        this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col, src: name });
         if (t.blocking) this.texts.push({ txt: 'SWAP BLOCKED!', x: t.x, y: t.y - 150, t: 0.65, max: 0.65, color: '#4fc3f7', size: 28 });
         return;
       }
       this.pushAfter(f, col); this.pushAfter(t, col);
       const tx = t.x, ty = t.y; t.x = f.x; t.y = f.y; f.x = tx; f.y = ty; f.face = t.x >= f.x ? 1 : -1;
       this.ring(f.x, f.y - 70, 110, col); this.ring(t.x, t.y - 70, 110, col); this.spark(f.x, f.y - 70, 20, col, 300, 0.5, 5, 0);
-      this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col });
+      this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col, src: name });
       this.texts.push({ txt: 'CLAP!', x: f.x, y: f.y - 150, t: 0.6, max: 0.6, color: col, size: 36 });
     } else if (sp.kind === 'speech') {
       this.sfx.speech(); this.ring(f.x, f.y - 80, 160, col); this.ring(f.x, f.y - 80, 320, col);
       this.enemiesOf(f).forEach((t) => {
         if (Math.abs(t.x - f.x) < sp.range && t.inv <= 0 && !t.ko && !t.ghost) {
-          t.act = null; t.stun = Math.max(t.stun, sp.stunTime); t.vx = 0; t.hp = Math.max(0, t.hp - sp.dmg); t.flash = 0.12;
+          const sdmg = this.adaptHit(t, name, sp.dmg * qm);
+          t.act = null; t.stun = Math.max(t.stun, sp.stunTime); t.vx = 0; t.hp = Math.max(0, t.hp - sdmg); t.flash = 0.12;
           this.ring(t.x, t.y - 80, 140, '#fff'); this.spark(t.x, t.y - 80, 16, '#fff', 260, 0.5, 5, 0);
           this.texts.push({ txt: "DON'T MOVE!", x: t.x, y: t.y - 170, t: 1, max: 1, color: '#fff', size: 38 });
+        }
+      });
+    } else if (sp.kind === 'morph') {
+      f.mahoraga = sp.morphDur || 22; f.inv = Math.max(f.inv, 1.2); f.hp = Math.min(100, f.hp + 12);
+      f.aura = 2.0; f.auraC = '#ffd54f';
+      const s3 = f.skills.indexOf('summon_mahoraga');
+      if (s3 >= 0) f.cd[s3] = 1.0;
+      this.sfx.domainOpen(); this.sfx.wheel(); this.shake = Math.max(this.shake, 18);
+      this.flash = { t: 0.24, max: 0.24, c: '#ffd54f' };
+      this.pillars.push({ x: f.x, y: f.y, t: 0.65, max: 0.65, color: '#ffd54f', w: 110 });
+      this.ring(f.x, f.y - 80, 260, '#ffd54f'); this.ring(f.x, f.y - 80, 150, '#fff');
+      this.spark(f.x, f.y - 80, 34, '#ffd54f', 420, 0.7, 6, 120);
+      this.texts.push({ txt: 'WITH THIS TREASURE...', x: f.x, y: f.y - 195, t: 1.0, max: 1.0, color: '#ffd54f', size: 24 });
+      this.texts.push({ txt: 'MAHORAGA UNLEASHED!', x: f.x, y: f.y - 160, t: 1.15, max: 1.15, color: '#fff', size: 34 });
+      this.enemiesOf(f).forEach((t) => {
+        if (!t.ko && !t.ghost && Math.abs(t.x - f.x) < 190 && Math.abs(t.y - f.y) < 150) {
+          this.hit(f, t, { dmg: 6, kb: 520, stun: 0.4, vy: 280, big: true, color: '#ffd54f', src: name });
         }
       });
     } else if (sp.kind === 'buff') {
@@ -770,7 +920,7 @@ export class Game {
         this.pillars.push({ x: tx, y: ty, t: 0.5, max: 0.5, color: col, w: sp.radius * 0.7 }); this.sfx.thunder(); this.shake = Math.max(this.shake, 16);
         this.spark(tx, ty, 26, col, 420, 0.6, 6, 400); this.ring(tx, ty, sp.radius * 2.2, '#fff'); this.zaps.push({ x: tx, y: ty - 150, t: 0.3, color: col });
         this.enemiesOf(f).forEach((t) => {
-          if (!t.ko && !t.ghost && Math.abs(t.x - tx) < sp.radius && Math.abs(t.y - ty) < 160) this.hit(f, t, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, vy: sp.vy, big: true, color: col });
+          if (!t.ko && !t.ghost && Math.abs(t.x - tx) < sp.radius && Math.abs(t.y - ty) < 160) this.hit(f, t, { dmg: sp.dmg * qm, kb: sp.kb, stun: sp.stun, vy: sp.vy, big: true, color: col, src: name });
         });
       });
     }
@@ -789,19 +939,19 @@ export class Game {
     o.tick -= dt;
     if (o.tick <= 0) {
       o.tick = 0.25;
-      enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - o.x) < 110) this.hit(att, t, { dmg: 2, kb: 0, stun: 0.12, vy: 0, color: o.color }); });
+      enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - o.x) < 110) this.hit(att, t, { dmg: 2, kb: 0, stun: 0.12, vy: 0, color: o.color, src: o.src || 'blue' }); });
     }
     if (o.t >= o.hold) {
       this.ring(o.x, o.y, 220, o.color); this.ring(o.x, o.y, 120, '#fff'); this.spark(o.x, o.y, 34, o.color, 420, 0.6, 6, 200); this.shake = 14; this.sfx.boom();
-      enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - o.x) < 150) { t.inv = 0; this.hit(att, t, { dmg: o.dmg, kb: o.kb, stun: 0.5, vy: 400, big: true, color: o.color }); } });
+      enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - o.x) < 150) { t.inv = 0; this.hit(att, t, { dmg: o.dmg, kb: o.kb, stun: 0.5, vy: 400, big: true, color: o.color, src: o.src || 'blue' }); } });
       return false;
     }
     return true;
   }
   /* ---------------- CUTSCENE SYSTEM (10 ท่าคัตซีน!) ---------------- */
   startCutscene(f, o, sp, name) {
-    this.cutscene = { owner: f.i, target: o.i, sp, name, t: 0, dur: CUT_DUR, step: 0, ox: o.x, oy: o.y };
-    f.act = { name, t: 0, fired: true, hit: true }; f.vx = 0; f.vy = 0; f.inv = CUT_DUR + 0.4; f.climbing = false; f.ledge = null;
+    this.cutscene = { owner: f.i, target: o.i, sp, name, t: 0, dur: CUT_DUR, step: 0, ox: o.x, oy: o.y, qte: { t0: 0.50, t1: 1.08, done: false, ok: false, mul: 1.4 } };
+    f.act = { name, t: 0, fired: true, hit: true }; f.vx = 0; f.vy = 0; f.inv = CUT_DUR + 0.4; f.climbing = false; f.ledge = null; f.qte = null;
     o.act = null; o.vx = 0; o.vy = 0; o.stun = CUT_DUR + 0.4; o.inv = 0; o.climbing = false; o.ledge = null; o.ragdollT = 0;
     this.sfx.cutscene(); this.flash = { t: 0.24, max: 0.24, c: '#fff' }; this.shake = 14;
     this.ring(o.x, o.y - 80, 220, sp.color);
@@ -809,14 +959,32 @@ export class Game {
   updateCutscene(dt) {
     const cs = this.cutscene, f = this.fighters[cs.owner], o = this.fighters[cs.target], sp = cs.sp;
     cs.t += dt; f.inv = 0.5; f.vx = 0; f.vy = 0; o.vx = 0; o.vy = 0; o.stun = Math.max(o.stun, 0.5);
-    const dmgScale = sp.dmg * (f.pas.dmg || 1) * (f.amp > 0 ? f.ampMul : 1) * (o.pas.guard || 1);
+    if (cs.qte && !cs.qte.done) {
+      const pi = f.inp || {};
+      if (cs.t <= cs.qte.t1 && (pi.punch || pi.kick || pi.s1 || pi.s2 || pi.s3)) {
+        if (cs.t >= cs.qte.t0) {
+          cs.qte.done = true; cs.qte.ok = true;
+          this.sfx.perfect(); this.ring(f.x, f.y - 80, 210, '#ffd24a');
+          this.spark(o.x, o.y - 80, 22, '#ffd24a', 340, 0.45, 5, 0);
+          this.texts.push({ txt: `CRITICAL QTE ×${cs.qte.mul}!`, x: (f.x + o.x) / 2, y: o.y - 185, t: 0.8, max: 0.8, color: '#ffd24a', size: 36 });
+        } else {
+          cs.qte.done = true; cs.qte.ok = false;
+          this.sfx.miss(); this.texts.push({ txt: 'QTE MISS', x: f.x, y: f.y - 165, t: 0.5, max: 0.5, color: '#9e9e9e', size: 24 });
+        }
+      } else if (cs.t > cs.qte.t1) {
+        cs.qte.done = true;
+      }
+    }
+    const qm = cs.qte?.ok ? cs.qte.mul : 1;
+    const dmgScale = sp.dmg * (f.pas.dmg || 1) * (f.mahoraga > 0 ? 1.12 : 1) * (f.amp > 0 ? f.ampMul : 1) * (o.pas.guard || 1);
     const dir = o.x >= f.x ? 1 : -1;
     const beats = [0.40, 0.72, 1.02];
 
     if (cs.step < 3 && cs.t >= beats[cs.step]) {
       const k = cs.step++;
       const side = k % 2 ? -1 : 1;
-      o.hp = Math.max(0, o.hp - dmgScale * 0.12); o.flash = 0.12;
+      const bDmg = this.adaptHit(o, cs.name, dmgScale * 0.12);
+      o.hp = Math.max(0, o.hp - bDmg); o.flash = 0.12;
       if (sp.cut === 'bf3' || sp.cut === 'gamble') {
         this.pushAfter(f, sp.color);
         f.x = clamp(o.x - side * 72, 80, this.worldW - 80); f.y = o.y; f.face = side; f.act = { name: cs.name, t: 0.14 };
@@ -852,7 +1020,8 @@ export class Game {
     } else if (cs.step === 3 && cs.t >= 1.32) {
       cs.step = 4;
       const cx = (sp.cut === 'hollow' || sp.cut === 'uzumaki') ? (f.x + o.x) / 2 : o.x;
-      o.hp = Math.max(0, o.hp - dmgScale * 0.64); o.flash = 0.24; o.stun = Math.max(sp.stun, 0.9); o.ragdollT = 0.95;
+      const finDmg = this.adaptHit(o, cs.name, dmgScale * 0.64 * qm);
+      o.hp = Math.max(0, o.hp - finDmg); o.flash = 0.24; o.stun = Math.max(sp.stun, 0.9); o.ragdollT = 0.95;
       if (sp.cut === 'jacob') { o.ce = Math.max(0, o.ce - 40); o.amp = 0; }
       this.impulse(o, dir * 680, 440);
       for (let i = 0; i < 6; i++) this.zaps.push({ x: o.x + rnd(-40, 40), y: o.y - 80 + rnd(-40, 40), t: 0.4, color: i % 2 ? sp.color : '#fff' });
@@ -917,6 +1086,24 @@ export class Game {
     c.font = `44px ${FONT}`; c.lineWidth = 6; c.strokeStyle = '#000';
     c.strokeText(sp.jp || sp.short, W / 2, bar / 2); c.fillStyle = '#fff'; c.fillText(sp.jp || sp.short, W / 2, bar / 2);
     c.font = `24px ${FONT}`; c.fillStyle = sp.color; c.fillText(sp.name.toUpperCase(), W / 2, H - bar / 2);
+    if (cs.qte && t < 1.3) {
+      const q = cs.qte, f = this.fighters[cs.owner], qx = W / 2, qy = H - bar - 58;
+      if (!q.done) {
+        const inWin = t >= q.t0 && t <= q.t1;
+        const p = clamp(t / q.t1, 0, 1);
+        c.fillStyle = 'rgba(6, 4, 14, 0.85)'; c.fillRect(qx - 170, qy - 24, 340, 48);
+        c.strokeStyle = inWin ? '#ffd24a' : '#fff'; c.lineWidth = inWin ? 3 : 2; c.strokeRect(qx - 170, qy - 24, 340, 48);
+        c.fillStyle = '#1b142c'; c.fillRect(qx - 150, qy + 6, 300, 10);
+        const w0 = (q.t0 / q.t1) * 300;
+        c.fillStyle = inWin ? '#ffd24a' : '#ffa726aa'; c.fillRect(qx - 150 + w0, qy + 5, 300 - w0, 12);
+        c.fillStyle = '#fff'; c.fillRect(qx - 150 + p * 300 - 3, qy + 2, 6, 18);
+        c.font = `14px ${FONT}`; c.fillStyle = inWin ? '#ffd24a' : '#fff';
+        c.fillText(`QTE ×${q.mul}! TAP [${this.hints[f.i % 2][4]}]`, qx, qy - 8);
+      } else if (q.ok) {
+        c.font = `20px ${FONT}`; c.fillStyle = '#ffd24a'; c.shadowColor = '#ffd24a'; c.shadowBlur = 16;
+        c.fillText(`OVERDRIVE QTE ACTIVATED ×${q.mul}!`, qx, qy);
+      }
+    }
     c.restore();
   }
   /* ---------------- DOMAIN SYSTEM (+ Linger Battleground) ---------------- */
@@ -975,7 +1162,7 @@ export class Game {
         d.dotT = 0.55;
         enemies.forEach((t) => {
           const blkMul = D.ability === 'slash' ? (t.blocking ? 0.85 : 1) : (t.blocking ? 0.5 : 1);
-          const chip = (D.dot || 1.4) * (d.mult || 1) * (f.pas.dmg || 1) * blkMul;
+          const chip = this.adaptHit(t, `dom:${d.id}`, (D.dot || 1.4) * (d.mult || 1) * (f.pas.dmg || 1) * blkMul);
           t.hp = Math.max(0, t.hp - chip); t.flash = 0.06;
           this.spark(t.x, t.y - 80, 6, D.color, 200, 0.35, 4, 0);
           if (D.ability === 'drain') { t.ce = Math.max(0, t.ce - 6); f.hp = Math.min(100, f.hp + 0.9); }
@@ -996,12 +1183,12 @@ export class Game {
         } else if (D.ability === 'nails') {
           d.specT = 1.15;
           const fromL = Math.random() < 0.5, sx = fromL ? 90 : this.worldW - 90, dir = fromL ? 1 : -1;
-          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 820, owner: f.i, color: '#ff6bd6', style: 'nail', life: 2.8, r: 16, dmg: 5, kb: 220, stun: 0.2, small: true, face: dir, arrow: true });
+          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 820, owner: f.i, src: `dom:${d.id}`, color: '#ff6bd6', style: 'nail', life: 2.8, r: 16, dmg: 5, kb: 220, stun: 0.2, small: true, face: dir, arrow: true });
           this.sfx.shoot();
         } else if (D.ability === 'bloodorb') {
           d.specT = 1.25;
           const fromL = o.x > this.worldW / 2, sx = fromL ? 100 : this.worldW - 100, dir = fromL ? 1 : -1;
-          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 640, owner: f.i, color: '#ff2d55', style: 'red', life: 3.0, r: 22, dmg: 5, kb: 320, stun: 0.25, small: true, face: dir, boom: 55 });
+          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 640, owner: f.i, src: `dom:${d.id}`, color: '#ff2d55', style: 'red', life: 3.0, r: 22, dmg: 5, kb: 320, stun: 0.25, small: true, face: dir, boom: 55 });
           this.sfx.shoot();
         } else if (D.ability === 'echo') {
           d.specT = 1.5;
@@ -1025,17 +1212,17 @@ export class Game {
           this.later(0.55, () => {
             if (this.phase !== 'fight' || !this.dom || this.dom.st !== 'linger') return;
             this.pillars.push({ x: tx, y: ty, t: 0.45, max: 0.45, color: '#ff6d00', w: 50 }); this.sfx.boom();
-            enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - tx) < 75 && Math.abs(t.y - ty) < 120) this.hit(f, t, { dmg: 5, kb: 320, stun: 0.3, vy: 360, color: '#ff6d00' }); });
+            enemies.forEach((t) => { if (!t.ko && Math.abs(t.x - tx) < 75 && Math.abs(t.y - ty) < 120) this.hit(f, t, { dmg: 5, kb: 320, stun: 0.3, vy: 360, color: '#ff6d00', src: `dom:${d.id}` }); });
           });
         } else if (D.ability === 'shadow') {
           d.specT = 1.4;
           const dir = o.x >= f.x ? 1 : -1;
-          this.proj.push({ x: clamp(f.x, this.stageL + 30, this.stageR - 30), y: f.y - 24, vx: dir * 680, owner: f.i, color: '#7c4dff', life: 2.0, r: 26, dmg: 5, kb: 260, stun: 0.28, kind: 'dog', face: dir, small: true });
+          this.proj.push({ x: clamp(f.x, this.stageL + 30, this.stageR - 30), y: f.y - 24, vx: dir * 680, owner: f.i, src: `dom:${d.id}`, color: '#7c4dff', life: 2.0, r: 26, dmg: 5, kb: 260, stun: 0.28, kind: 'dog', face: dir, small: true });
           this.sfx.howl();
         } else if (D.ability === 'tide') {
           d.specT = 1.25;
           const fromL = Math.random() < 0.5, sx = fromL ? 80 : this.worldW - 80, dir = fromL ? 1 : -1;
-          this.proj.push({ x: sx, y: o.y - 70, sx, sy: o.y - 70, vx: dir * 760, owner: f.i, color: '#29b6f6', style: 'fish', life: 2.8, r: 20, dmg: 5, kb: 340, stun: 0.25, small: true, face: dir });
+          this.proj.push({ x: sx, y: o.y - 70, sx, sy: o.y - 70, vx: dir * 760, owner: f.i, src: `dom:${d.id}`, color: '#29b6f6', style: 'fish', life: 2.8, r: 20, dmg: 5, kb: 340, stun: 0.25, small: true, face: dir });
         } else if (D.ability === 'fps') {
           d.specT = 1.65;
           enemies.forEach((t) => {
@@ -1049,7 +1236,7 @@ export class Game {
         } else if (D.ability === 'sphere') {
           d.specT = 1.25;
           const fromL = o.x > this.worldW / 2, sx = fromL ? 120 : this.worldW - 120, dir = fromL ? 1 : -1;
-          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 700, owner: f.i, color: '#e0e0e0', style: 'red', life: 3.0, r: 22, dmg: 6, kb: 360, stun: 0.3, small: true, face: dir });
+          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 700, owner: f.i, src: `dom:${d.id}`, color: '#e0e0e0', style: 'red', life: 3.0, r: 22, dmg: 6, kb: 360, stun: 0.3, small: true, face: dir });
         } else { d.specT = 1.2; }
       }
       if (d.lingerT >= d.lingerDur) { this.dom = null; }
@@ -1087,7 +1274,8 @@ export class Game {
       if (best) {
         const perfect = best.e <= PERFECT; best.b.r = perfect ? 'perfect' : 'good'; d.streak++; d.best = Math.max(d.best, d.streak); if (perfect) d.perfect++;
         enemies.forEach((t) => {
-          t.hp = Math.max(0, t.hp - (perfect ? 1.4 : 0.7) * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1)); t.flash = 0.08;
+          const beatDmg = this.adaptHit(t, `dom:${d.id}`, (perfect ? 1.4 : 0.7) * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1));
+          t.hp = Math.max(0, t.hp - beatDmg); t.flash = 0.08;
           this.spark(t.x, t.y - 80, perfect ? 16 : 8, perfect ? '#ffd24a' : col, 320, 0.4, 5, 0); this.ring(t.x, t.y - 80, perfect ? 140 : 90, perfect ? '#ffd24a' : col);
         });
         this.judgeTxt(d, perfect ? 'PERFECT!' : 'GOOD', perfect ? '#ffd24a' : '#3dd6ff'); perfect ? this.sfx.perfect() : this.sfx.good();
@@ -1098,7 +1286,8 @@ export class Game {
   }
   domainArt(d, f, o) {
     const D = DOMAINS[d.id], A = D.art, col = D.color, dir = o.x >= f.x ? 1 : -1, fx = A.fx;
-    o.hp = Math.max(0, o.hp - A.dmg * 0.7 * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1)); o.flash = 0.1; this.impulse(o, dir * 160, 140);
+    const artDmg = this.adaptHit(o, `dom:${d.id}`, A.dmg * 0.7 * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1));
+    o.hp = Math.max(0, o.hp - artDmg); o.flash = 0.1; this.impulse(o, dir * 160, 140);
     this.sfx.art(); this.shake = Math.max(this.shake, 10);
     this.texts.push({ txt: A.name.toUpperCase() + '!', x: o.x, y: o.y - 175, t: 0.9, max: 0.9, color: col, size: 28 });
     if (fx === 'zap') for (let i = 0; i < 6; i++) this.later(i * 0.04, () => this.zaps.push({ x: o.x + rnd(-70, 70), y: o.y - rnd(20, 140), t: 0.25, color: i % 2 ? '#e1f5fe' : col }));
@@ -1119,7 +1308,8 @@ export class Game {
     this.sfx.hit(); this.shake = tk.final ? 22 : 6;
     enemies.forEach((o) => {
       const dir = o.x >= f.x ? 1 : -1;
-      o.hp = Math.max(0, o.hp - tk.dmg * (d.mult || 1) * rm * (1 - d.resist) * (f.pas.dmg || 1)); o.flash = 0.1; o.inv = 0;
+      const tickDmg = this.adaptHit(o, `dom:${d.id}`, tk.dmg * (d.mult || 1) * rm * (1 - d.resist) * (f.pas.dmg || 1));
+      o.hp = Math.max(0, o.hp - tickDmg); o.flash = 0.1; o.inv = 0;
       this.impulse(o, dir * (tk.final ? 520 : 80), tk.final ? 420 : 120);
       this.spark(o.x, o.y - 80, tk.final ? 40 : 12, col, tk.final ? 500 : 280, 0.5, 5);
       if (d.id === 'void' || d.id === 'moon' || d.id === 'soulhome' || d.id === 'cursedvoice') { this.flash = { t: 0.1, max: 0.1, c: col }; this.zaps.push({ x: o.x, y: o.y - 80, t: 0.2, color: col }); }
@@ -1177,10 +1367,11 @@ export class Game {
     const domDmg = da && da.isOwner
       ? (da.ability === 'guilty' ? 1.25 : da.ability === 'nullzone' ? 1.4 : da.ability === 'mutual' ? 1.2 : (da.ability === 'pull' || da.ability === 'clapfest') && o.basic ? 1.35 : 1)
       : 1;
-    let dmg = o.dmg * (1 + Math.min(att.combo, 4) * 0.08) * (att.pas.dmg || 1) * (att.amp > 0 ? att.ampMul : 1) * domDmg * (def.pas.guard || 1);
+    let dmg = o.dmg * (1 + Math.min(att.combo, 4) * 0.08) * (att.pas.dmg || 1) * (att.mahoraga > 0 ? 1.12 : 1) * (att.amp > 0 ? att.ampMul : 1) * domDmg * (def.pas.guard || 1);
     if (o.basic && att.pas.basic) dmg *= att.pas.basic;
     const critChance = da && da.isOwner && da.ability === 'ratio73' ? 1 : (att.pas.crit || 0) + (da && da.isOwner && da.ability === 'nails' ? 0.3 : 0);
     if (critChance > 0 && Math.random() < critChance) { dmg *= 1.6; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
+    dmg = this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg);
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
     def.stun = Math.max(def.stun, o.stun); def.act = null; def.inv = 0.2; def.flash = 0.12;
     if (o.ragdoll || o.kb >= 520) def.ragdollT = Math.max(def.ragdollT, o.ragdoll || 0.72);
@@ -1223,6 +1414,10 @@ export class Game {
   pose(f) {
     const a = f.act, t = this.time; let P = { lean: 0, crouch: 0, hF: [22, 18], hB: [-10, 24], fF: [14, 0], fB: [-14, 0] };
     if (f.ko || f.ragdollT > 0) return P;
+    if (this.phase === 'ko' && this.victory && !f.ko) {
+      const s = Math.sin(t * 4) * 3;
+      return { lean: -5, crouch: 4, hF: [36, -42 + s], hB: [-26, 12 - s * 0.5], fF: [22, 0], fB: [-20, 0] };
+    }
     if (f.ledge) {
       const tug = f.ledge.tug > 0 ? -10 : 0, w = Math.sin(t * 14) * 5;
       return { lean: -4, crouch: 8 + tug, hF: [4, -52], hB: [-4, -50], fF: [8 + w, 46], fB: [-8 - w, 42] };
@@ -1313,7 +1508,7 @@ export class Game {
   render() {
     const c = this.c, s = this.shake;
     c.save(); c.translate(rnd(-s, s), rnd(-s, s));
-    if (this.is2v2) {
+    if (this.is2v2 || this.victory) {
       c.translate(W / 2, H / 2);
       c.scale(this.cam.z, this.cam.z);
       c.translate(-this.cam.x, -this.cam.y);
@@ -1371,6 +1566,7 @@ export class Game {
     this.parts.forEach((p) => { c.globalAlpha = Math.max(0, p.life / p.max); c.fillStyle = p.color; c.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); });
     c.globalAlpha = 1;
     this.fighters.forEach((f) => f.ledge && this.drawLedgeQTE(f));
+    this.fighters.forEach((f) => f.qte && !f.qte.done && f.act && this.drawSkillQTE(f));
     if (this.cutscene) this.drawCutsceneOverlay();
     this.texts.forEach((t) => { c.globalAlpha = Math.min(1, t.t / t.max * 2); c.font = `${t.size}px ${FONT}`; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#000'; c.strokeText(t.txt, t.x, t.y); c.fillStyle = t.color; c.fillText(t.txt, t.x, t.y); });
     c.globalAlpha = 1; c.restore();
@@ -1378,6 +1574,101 @@ export class Game {
     if (this.flash) { c.globalAlpha = (this.flash.t / this.flash.max) * 0.7; c.fillStyle = this.flash.c; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
     this.drawHud(); if (this.dom) this.drawDomainIntro();
     this.drawClashHud();
+    if (this.phase === 'ko' && this.victory) this.drawVictoryCutscene();
+  }
+  drawSkillQTE(f) {
+    const c = this.c, q = f.qte, x = f.x, y = f.y - 160;
+    const inWin = q.t >= q.start && q.t <= q.end;
+    const k = clamp(q.t / q.dur, 0, 1);
+    const rMax = 46, rTarget = 22, rCur = rMax * (1 - k * 0.68);
+    c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.beginPath(); c.arc(x, y, rTarget, 0, 7);
+    c.fillStyle = inWin ? 'rgba(255, 210, 74, 0.28)' : 'rgba(10, 6, 18, 0.65)'; c.fill();
+    c.strokeStyle = inWin ? '#ffd24a' : '#fff8'; c.lineWidth = inWin ? 4 : 2.5;
+    if (inWin) { c.shadowColor = '#ffd24a'; c.shadowBlur = 18; }
+    c.stroke(); c.shadowBlur = 0;
+    c.beginPath(); c.arc(x, y, rCur, 0, 7);
+    c.strokeStyle = inWin ? '#fff' : '#ffab40'; c.lineWidth = 3; c.stroke();
+    c.font = `12px ${FONT}`; c.lineWidth = 4; c.strokeStyle = '#000';
+    const txt = `QTE [${this.hints[f.i % 2][4]}] ×${q.mul}`;
+    c.strokeText(txt, x, y - 34); c.fillStyle = inWin ? '#ffd24a' : '#fff'; c.fillText(txt, x, y - 34);
+    c.restore();
+  }
+  drawVictoryCutscene() {
+    const v = this.victory; if (!v) return;
+    const c = this.c, t = v.t, bar = clamp(t / 0.25, 0, 1) * 68;
+    const wf = this.fighters[v.idx];
+    c.save();
+    /* 1) Speedlines & Golden/Signature Finisher Impact Flash at start */
+    if (t < 0.65) {
+      const a = 1 - t / 0.65;
+      c.save();
+      c.globalAlpha = a * 0.55; c.strokeStyle = v.color; c.lineWidth = 2.5;
+      for (let i = 0; i < 42; i++) {
+        const an = (i / 42) * Math.PI * 2 + t * 1.4, r0 = 140 + ((i * 37) % 80);
+        c.beginPath(); c.moveTo(W / 2 + Math.cos(an) * r0, H / 2 + Math.sin(an) * r0);
+        c.lineTo(W / 2 + Math.cos(an) * (r0 + 780), H / 2 + Math.sin(an) * (r0 + 780)); c.stroke();
+      }
+      c.restore();
+    }
+    /* 2) Letterbox bars */
+    c.fillStyle = '#05030b';
+    c.fillRect(0, 0, W, bar); c.fillRect(0, H - bar, W, bar);
+    c.fillStyle = v.color; c.fillRect(0, bar - 3, W, 3); c.fillRect(0, H - bar, W, 3);
+
+    /* Top bar label */
+    const slideIn = clamp((t - 0.12) / 0.25, 0, 1);
+    c.globalAlpha = slideIn; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `24px ${FONT}`; c.fillStyle = '#ffd24a';
+    c.fillText(`${v.label || 'K.O.'} · ${v.sub}`, W / 2, bar / 2);
+
+    /* 3) Heroic Diagonal Comic Finisher Card (bottom) */
+    if (t > 0.22) {
+      const k = clamp((t - 0.22) / 0.32, 0, 1);
+      const sx = -420 * (1 - k);
+      c.save();
+      c.translate(sx, 0);
+      c.fillStyle = 'rgba(7, 4, 15, 0.9)';
+      c.beginPath();
+      c.moveTo(0, H - bar - 152); c.lineTo(740, H - bar - 172); c.lineTo(680, H - bar); c.lineTo(0, H - bar); c.closePath();
+      c.fill();
+      c.strokeStyle = v.color; c.lineWidth = 4; c.stroke();
+
+      c.textAlign = 'left';
+      c.font = `15px ${FONT}`; c.fillStyle = '#ffd24a';
+      c.fillText('VICTORY FINISHER · 勝者', 44, H - bar - 134);
+
+      c.font = `54px ${FONT}`; c.lineWidth = 8; c.strokeStyle = '#000'; c.shadowColor = v.color; c.shadowBlur = 24;
+      c.strokeText(v.name, 44, H - bar - 84); c.fillStyle = '#fff'; c.fillText(v.name, 44, H - bar - 84);
+      c.shadowBlur = 0;
+
+      if (v.jp) {
+        const nw = c.measureText(v.name).width;
+        c.font = `24px ${FONT}`; c.fillStyle = v.color;
+        c.fillText(v.jp, Math.min(540, 58 + nw), H - bar - 82);
+      }
+      c.font = `17px ${FONT}`; c.fillStyle = '#e5def7';
+      c.fillText(`"${v.line}"`, 44, H - bar - 30);
+      c.restore();
+    }
+
+    /* 4) Big K.O. slash burst that settles gracefully */
+    if (t < 1.35) {
+      const pop = clamp(t / 0.14, 0, 1), fade = t > 0.9 ? clamp(1 - (t - 0.9) / 0.45, 0, 1) : 1;
+      const sc = 1.6 - pop * 0.6;
+      c.save(); c.globalAlpha = fade; c.translate(W / 2, H * 0.28); c.rotate(-0.06); c.scale(sc, sc);
+      c.textAlign = 'center'; c.font = `112px ${FONT}`; c.lineWidth = 14; c.strokeStyle = '#000';
+      c.shadowColor = v.color; c.shadowBlur = 36;
+      c.strokeText(v.label || 'K.O.!', 0, 0); c.fillStyle = '#ffd24a'; c.fillText(v.label || 'K.O.!', 0, 0);
+      c.restore();
+    }
+
+    /* 5) Bottom right winner badge */
+    if (wf) {
+      c.textAlign = 'right'; c.font = `16px ${FONT}`; c.fillStyle = '#fff8';
+      c.fillText(`HP REMAINING: ${Math.ceil(wf.hp)}%`, W - 36, H - bar / 2);
+    }
+    c.restore();
   }
   drawLedgeQTE(f) {
     const c = this.c, L = f.ledge, x = clamp(L.x + L.side * 10, 95, this.worldW - 95), y = GROUND - 58;
@@ -1535,12 +1826,39 @@ export class Game {
     c.restore();
   }
   drawFighter(f) {
-    const c = this.c, col = f.flash > 0 ? '#fff' : f.color, a = f.act, sp = a && spec(a.name);
+    const c = this.c, col = f.flash > 0 ? '#fff' : (f.mahoraga > 0 ? '#f5efe0' : f.color), a = f.act, sp = a && spec(a.name);
     if (f.floorY !== null && !f.ledge) {
       const k = Math.max(0.3, 1 - Math.max(0, f.floorY - f.y) / 300);
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(f.x, f.floorY + 4, 30 * k, 7 * k, 0, 0, 7); c.fill();
     }
+    if (f.mahoraga > 0) {
+      c.save();
+      c.globalAlpha = 0.25 + 0.12 * Math.sin(this.time * 10); c.strokeStyle = '#ffd54f'; c.shadowColor = '#ffd54f'; c.shadowBlur = 24; c.lineWidth = 3;
+      c.beginPath(); c.ellipse(f.x, f.y - 68, 56, 88, 0, 0, 7); c.stroke();
+      c.restore();
+    }
     this.drawRig(f.rig, col, f.inv > 0 && f.flash <= 0 && f.act?.name !== 'domain' ? 0.65 : 1, f.face, f.ko, f.gear);
+    if (f.mahoraga > 0 && !f.ko && f.rig) {
+      const R = f.rig, spin = this.time * 1.4 + (f.adaptSpin > 0 ? (0.48 - f.adaptSpin) * 16 : 0);
+      c.save();
+      /* Spinning Eight-Handled Dharma Wheel above Mahoraga head */
+      c.translate(R.head.x, R.head.y - 30); c.rotate(spin);
+      c.strokeStyle = f.adaptSpin > 0 ? '#fff' : '#ffd54f'; c.shadowColor = '#ffd54f'; c.shadowBlur = f.adaptSpin > 0 ? 28 : 16; c.lineWidth = 3.5;
+      c.beginPath(); c.arc(0, 0, 18, 0, 7); c.stroke();
+      for (let i = 0; i < 8; i++) {
+        const ang = (i * Math.PI) / 4;
+        c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(ang) * 24, Math.sin(ang) * 24); c.stroke();
+        c.fillStyle = '#ffd54f'; c.beginPath(); c.arc(Math.cos(ang) * 24, Math.sin(ang) * 24, 3, 0, 7); c.fill();
+      }
+      c.restore();
+      /* Sword of Extermination blade attached to front arm */
+      c.save();
+      const angArm = Math.atan2(R.hF.y - R.eF.y, R.hF.x - R.eF.x);
+      c.translate(R.hF.x, R.hF.y); c.rotate(angArm);
+      c.strokeStyle = '#ffd54f'; c.fillStyle = '#fff8e1'; c.shadowColor = '#ffd54f'; c.shadowBlur = 14; c.lineWidth = 2.5;
+      c.beginPath(); c.moveTo(-4, -5); c.lineTo(42, 0); c.lineTo(-4, 5); c.closePath(); c.fill(); c.stroke();
+      c.restore();
+    }
     if (f.ledge && (f.ledge.shield || 0) > 0) {
       c.save(); c.strokeStyle = '#4fc3f7'; c.fillStyle = 'rgba(79, 195, 247, 0.16)'; c.shadowColor = '#4fc3f7'; c.shadowBlur = 18;
       c.lineWidth = 3; c.beginPath(); c.arc(f.x, f.y - 36, 48, 0, 7); c.fill(); c.stroke(); c.restore();
@@ -1948,7 +2266,7 @@ export class Game {
       label(full ? `領域展開 [${this.hints[i][3]}]` : `${Math.floor(f.ce)}%`, i ? cx0 - 8 : cx0 + cw + 8, 88, 12, full ? '#ffd24a' : '#d1c4e9', i ? 'right' : 'left');
       const off = i ? w - 466 : 0;
       for (let s = 0; s < 3; s++) {
-        const id = f.skills[s], sk2 = id && SKILLS[id], tw = 150, sx = x + off + s * 158; if (!sk2) continue;
+        const id = this.effectiveSkill(f, s), sk2 = id && SKILLS[id], tw = 150, sx = x + off + s * 158; if (!sk2) continue;
         const r = 1 - f.cd[s] / (sk2.cd * (f.pas.cd || 1)), ready = r >= 1;
         c.save(); this.pg(sx, 98, tw, 26, 8); c.clip(); c.fillStyle = '#120a22'; c.fillRect(sx - 10, 98, tw + 20, 26);
         c.fillStyle = ready ? sk2.color : sk2.color + '55'; c.fillRect(sx - 10, 98, (tw + 20) * Math.min(1, r), 26); c.restore();
@@ -1956,7 +2274,9 @@ export class Game {
         c.textAlign = 'center'; c.font = `10px ${FONT}`; c.fillStyle = ready ? '#000' : '#fff'; c.fillText(`[${this.hints[i][s]}] ${sk2.short}${ready ? '' : ' ' + f.cd[s].toFixed(1)}`, sx + tw / 2, 112);
       }
       const buffY = this.is2v2 ? 188 : 140, comboY = this.is2v2 ? 216 : 168;
-      if (f.amp > 0) label(`BUFF ${f.amp.toFixed(1)}s`, i ? x + w : x, buffY, 13, f.auraC, i ? 'right' : 'left');
+      const adN = f.adaptN ?? Object.keys(f.adapt || {}).length;
+      if (f.mahoraga > 0) label(`MAHORAGA ${f.mahoraga.toFixed(1)}s · ADAPT x${adN}`, i ? x + w : x, buffY, 13, '#ffd54f', i ? 'right' : 'left');
+      else if (f.amp > 0) label(`BUFF ${f.amp.toFixed(1)}s`, i ? x + w : x, buffY, 13, f.auraC, i ? 'right' : 'left');
       if (f.combo >= 2 && f.comboT > 0) { c.shadowColor = '#ff6d00'; c.shadowBlur = 16; label(`${f.combo} HIT COMBO!`, i ? x + w : x, comboY, 30, '#ffeb3b', i ? 'right' : 'left'); c.shadowBlur = 0; }
     });
     if (this.is2v2) {
@@ -1984,6 +2304,6 @@ export class Game {
     const big = (txt, y, size, col) => { c.save(); c.translate(W / 2, y); c.rotate(-0.05); c.textAlign = 'center'; c.font = `${size}px ${FONT}`; c.lineWidth = Math.max(6, size / 8); c.strokeStyle = '#000'; c.lineJoin = 'round'; c.strokeText(txt, 0, 0); c.shadowColor = col; c.shadowBlur = 28; c.fillStyle = col; c.fillText(txt, 0, 0); c.restore(); };
     if (this.phase === 'countdown') { big(`ROUND ${this.round}`, H / 2 - 110, 40, '#fff'); big(String(Math.max(1, Math.ceil(this.phaseT))), H / 2, 170, '#ffd24a'); }
     else if (this.banner > 0) big('FIGHT!', H / 2, 150, '#ff2d55');
-    else if (this.phase === 'ko') { big(this.label || 'K.O.', H / 2 - 40, 120, '#ff2d55'); big(this.msg, H / 2 + 50, 32, '#fff'); }
+    else if (this.phase === 'ko' && !this.victory) { big(this.label || 'K.O.', H / 2 - 40, 120, '#ff2d55'); big(this.msg, H / 2 + 50, 32, '#fff'); }
   }
 }

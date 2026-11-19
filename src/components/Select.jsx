@@ -145,7 +145,12 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
               return (
                 <button key={s} className={'skill' + (slot >= 0 ? ' on' : '')} style={{ '--k': SKILLS[s].color }} onClick={() => toggle(s)}>
                   {slot >= 0 && <em>{slot + 1}</em>}
-                  <b>{isCut(s) && <i className="cut-badge">คัตซีน</i>}{SKILLS[s].name}</b>
+                  <b>
+                    {isCut(s) && <i className="cut-badge">คัตซีน</i>}
+                    {SKILLS[s].kind === 'morph' && <i className="cut-badge">แปลงร่าง</i>}
+                    {(SKILLS[s].qte || isCut(s)) && <i className="cut-badge">QTE</i>}
+                    {SKILLS[s].name}
+                  </b>
                   <span>{SKILLS[s].desc}</span><small>คูลดาวน์ {SKILLS[s].cd} วิ</small>
                 </button>
               );
