@@ -143,10 +143,9 @@ export function OpeningIntro({ onReveal, onDone }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (['Enter', 'Space', 'Escape'].includes(e.code)) { e.preventDefault(); beginExit(true); }
+      if (e.code === 'Space') { e.preventDefault(); beginExit(true); }
     };
     addEventListener('keydown', onKey);
-    const autoTimer = setTimeout(() => beginExit(false), 3100);
 
     const cv = ref.current;
     const c = cv?.getContext('2d');
@@ -199,10 +198,11 @@ export function OpeningIntro({ onReveal, onDone }) {
         c.restore();
 
         motes.forEach((m) => {
-          const prog = t < 0.85 ? 1 - t / 0.85 : (t - 0.85) * 1.6;
-          const rad = Math.max(8, m.r * prog + (t >= 0.85 ? 40 : 0) + ease * 260);
+          const rad = t < 0.85
+            ? Math.max(8, m.r * (1 - t / 0.85))
+            : m.r * (0.72 + 0.16 * Math.sin(t * 0.9 + m.an)) + ease * 260;
           const a = m.an + t * m.sp;
-          c.globalAlpha = introAlpha * (t < 0.85 ? 0.85 : Math.max(0, 0.9 - (t - 0.85) * 0.4));
+          c.globalAlpha = introAlpha * (t < 0.85 ? 0.85 : 0.35 + 0.35 * Math.abs(Math.sin(t * 1.4 + m.an)));
           c.fillStyle = m.col;
           c.fillRect(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, m.sz, m.sz);
         });
@@ -261,7 +261,6 @@ export function OpeningIntro({ onReveal, onDone }) {
 
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(autoTimer);
       removeEventListener('keydown', onKey);
     };
   }, []); // eslint-disable-line
@@ -272,10 +271,10 @@ export function OpeningIntro({ onReveal, onDone }) {
       onClick={() => beginExit(true)}
       role="button"
       tabIndex={0}
-      aria-label="เข้าสู่หน้าหลักเกม"
+      aria-label="กด Spacebar เพื่อเข้าสู่เกม"
     >
       <canvas ref={ref} className="intro-canvas" />
-      <p className="intro-skip">คลิกหรือกด Enter / Space เพื่อเข้าสู่เกม</p>
+      <p className="intro-skip">PRESS [ SPACEBAR ] · กด SPACEBAR เพื่อเข้าสู่หน้าเกม</p>
     </div>
   );
 }
