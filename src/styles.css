@@ -152,3 +152,25 @@ button { font-family: inherit; cursor: pointer; }
 .panel.locked .swatches button, .panel.locked .skins button, .panel.locked .chars button, .panel.locked .skills button, .panel.locked .mini { pointer-events: none; }
 .arena-net { position: absolute; left: 8px; bottom: 8px; background: #000a; border: 1px solid #fff3; padding: 3px 10px; font-size: 11px; color: #cfd8dc; pointer-events: none; }
 
+/* ---------- อนิเมชั่นหน้า Intro และหน้าหลัก ---------- */
+.intro-screen { position: fixed; inset: 0; background: #05020b; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; animation: introFade .4s ease-out; }
+.intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.intro-skip { position: relative; z-index: 2; margin-bottom: 28px; font-size: 13px; letter-spacing: .1em; opacity: .78; padding: 6px 16px; background: #0009; border: 1px solid #ffffff33; animation: blink .85s infinite alternate; }
+@keyframes introFade { from { opacity: 0; } to { opacity: 1; } }
+
+.menu-canvas { position: absolute !important; inset: 0; width: 100%; height: 100%; z-index: 0 !important; pointer-events: none; }
+.intro-replay { position: absolute !important; top: 16px; right: 16px; z-index: 3 !important; background: #ffffff12; color: #fff; border: 1px solid #ffffff35; padding: 6px 14px; font-size: 12px; font-weight: 600; transform: skewX(-8deg); transition: background .15s; }
+.intro-replay:hover { background: var(--violet); border-color: var(--violet); }
+.menu .lockup { animation: floatLock 4.2s ease-in-out infinite; }
+.menu .l2 { animation: auraPulse 2.8s ease-in-out infinite alternate; }
+.menu-actions { animation: riseIn .45s .12s cubic-bezier(.2, .8, .2, 1) both; }
+.menu-controls { animation: riseIn .55s .22s cubic-bezier(.2, .8, .2, 1) both; }
+.menu-hint { animation: riseIn .6s .32s cubic-bezier(.2, .8, .2, 1) both; }
+.btn { position: relative; overflow: hidden; }
+.btn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); transition: transform .5s; }
+.btn:hover::after { transform: translateX(120%); }
+@keyframes floatLock { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes auraPulse { from { text-shadow: 6px 5px 0 var(--red), -5px -4px 0 var(--blue); } to { text-shadow: 6px 5px 0 var(--red), -5px -4px 0 var(--blue), 0 0 28px rgba(61, 214, 255, .55); } }
+@keyframes riseIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .menu .lockup, .menu .l2, .intro-skip, .menu-actions, .menu-controls, .menu-hint { animation: none; } }
+

@@ -3,6 +3,7 @@ import Arena from './components/Arena.jsx';
 import Select from './components/Select.jsx';
 import Settings from './components/Settings.jsx';
 import OnlineLobby from './components/OnlineLobby.jsx';
+import { MenuBgCanvas, OpeningIntro } from './components/MenuScene.jsx';
 import { loadControls, keyLabel } from './game/keys.js';
 import { CHARACTERS } from './game/constants.js';
 import { sfx, unlockAudio } from './game/audio.js';
@@ -20,7 +21,7 @@ const start = (id) => ({ ch: CHARACTERS[id], id });
 const fighterName = (cfg, i) => CHARACTERS[cfg.chars[i]]?.name || `PLAYER ${i + 1}`;
 
 export default function App() {
-  const [screen, setScreen] = useState('menu');
+  const [screen, setScreen] = useState(() => (new URLSearchParams(location.search).get('room') ? 'lobby' : 'intro'));
   const [cfg, setCfg] = useState(() => {
     const [a, b] = [start('gojo'), start('sukuna')];
     return {
@@ -162,6 +163,7 @@ export default function App() {
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ }
   };
 
+  if (screen === 'intro') return <OpeningIntro onDone={() => setScreen('menu')} />;
   if (screen === 'arena') {
     return (
       <Arena
@@ -217,6 +219,7 @@ export default function App() {
   const [c1, c2] = loadControls();
   return (
     <div className="screen menu">
+      <MenuBgCanvas />
       <div className="ghost-kanji" aria-hidden="true">呪</div>
       <svg className="sigil" viewBox="0 0 400 400" aria-hidden="true">
         <g fill="none" stroke="currentColor">
@@ -227,21 +230,22 @@ export default function App() {
           <rect x="95" y="95" width="210" height="210" strokeWidth="2" transform="rotate(45 200 200)" />
         </g>
       </svg>
+      <button className="intro-replay" onClick={() => { unlockAudio(); sfx.click(); setScreen('intro'); }}>▶ ดู Intro</button>
       <header className="lockup">
         <p className="jp-sub">呪力闘技場</p>
         <h1 className="logo"><span className="l1">STICKMAN</span><span className="l2">BATTLE</span></h1>
         <p className="tag">LOCAL & ONLINE ARENA · สู้กันได้ทั้งเครื่องเดียวและออนไลน์</p>
       </header>
-      <div className="row">
+      <div className="row menu-actions">
         <button className="btn big" onClick={() => go('select')}>เล่น 2 คน (เครื่องเดียว)</button>
         <button className="btn big" style={{ background: 'var(--violet)' }} onClick={() => go('lobby')}>เล่นออนไลน์</button>
         <button className="btn big ghost" onClick={() => go('settings')}>ตั้งปุ่ม</button>
       </div>
-      <div className="controls">
+      <div className="controls menu-controls">
         <div><h4>PLAYER 1</h4><p><Lines c={c1} /></p></div>
         <div><h4>PLAYER 2</h4><p><Lines c={c2} />(เล่นออนไลน์ใช้ปุ่ม P1 ได้เลย)</p></div>
       </div>
-      <p className="hint">
+      <p className="hint menu-hint">
         กดป้องกันตรงจังหวะ = Parry · ใกล้ตกขอบแมพ กดกระโดด/ต่อยรัวๆ (QTE) เพื่อดึงตัวขึ้น ·
         เปิด Domain เสร็จอาณาเขตจะค้างต่อ 4 วิ พร้อมความสามารถพิเศษและสู้กันต่อข้างในได้! · Esc / P = หยุดเกม
       </p>
