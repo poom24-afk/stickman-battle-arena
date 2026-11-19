@@ -26,7 +26,9 @@ export default function App() {
   const [cfg, setCfg] = useState(() => {
     const [a, b] = [start('gojo'), start('sukuna')];
     return {
+      mode: '1v1', p2Ai: false,
       chars: [a.id, b.id], colors: [a.ch.color, b.ch.color], skins: ['default', 'default'],
+      allies: ['yuji', 'mahito'],
       loadouts: [[...a.ch.skills], [...b.ch.skills]], domains: [a.ch.domain, b.ch.domain], arena: 1, target: 2,
     };
   });
@@ -81,6 +83,7 @@ export default function App() {
           chars: [c.chars[0], msg.patch.char],
           colors: [c.colors[0], msg.patch.color],
           skins: [c.skins[0], msg.patch.skin],
+          allies: [c.allies?.[0] || 'yuji', msg.patch.ally ?? (c.allies?.[1] || 'mahito')],
           loadouts: [c.loadouts[0], msg.patch.loadout],
           domains: [c.domains[0], msg.patch.domain],
         }));
@@ -126,6 +129,7 @@ export default function App() {
           type: 'cfg-p2',
           patch: {
             char: next.chars[1], color: next.colors[1], skin: next.skins[1],
+            ally: next.allies?.[1] || 'mahito',
             loadout: next.loadouts[1], domain: next.domains[1],
           },
         });
@@ -193,13 +197,13 @@ export default function App() {
     );
   }
   if (screen === 'result') {
-    const w = result.winner, ch = CHARACTERS[cfg.chars[w]];
+    const w = result.winner, is2v2 = cfg.mode === '2v2', ch = CHARACTERS[cfg.chars[w]];
     const isGuest = netState?.role === 'guest';
     return (
-      <div className="screen result" style={{ '--c': cfg.colors[w] }}>
+      <div className="screen result" style={{ '--c': cfg.colors[w] || '#ffd24a' }}>
         <div className="ghost-kanji" aria-hidden="true">{ch ? ch.jp.slice(0, 2) : '勝'}</div>
         <h1 className="ko">K.O.</h1>
-        <h2 className="winner">{fighterName(cfg, w)} ชนะ!</h2>
+        <h2 className="winner">{is2v2 ? `TEAM ${w === 0 ? 'A' : 'B'} (${fighterName(cfg, w)}) ชนะ!` : `${fighterName(cfg, w)} ชนะ!`}</h2>
         <p className="score">{result.scores[0]} <i>-</i> {result.scores[1]}</p>
         <div className="row">
           {!isGuest && <button className="btn" onClick={fight}>สู้อีกรอบ</button>}

@@ -172,6 +172,21 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
         </>
       )}
       {tab !== 'dom' && <p className="dline">โดเมน: <b>{DOMAINS[cfg.domains[i]].jp}</b> {DOMAINS[cfg.domains[i]].name}</p>}
+      {cfg.mode === '2v2' && (
+        <div className="ally-box">
+          <span className="ally-lbl">คู่หู AI ประจำทีม {i === 0 ? 'A' : 'B'}:</span>
+          <div className="ally-list">
+            {CHAR_IDS.map((id) => (
+              <button key={id} disabled={locked}
+                className={'ally-chip' + ((cfg.allies?.[i] || 'yuji') === id ? ' on' : '')}
+                style={{ '--k': CHARACTERS[id].color }}
+                onClick={() => !locked && setCfg((c) => ({ ...c, allies: (c.allies || ['yuji', 'mahito']).map((x, j) => (j === i ? id : x)) }))}>
+                {CHARACTERS[id].name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -181,10 +196,24 @@ export default function Select({ cfg, setCfg, onStart, onBack, online }) {
   const isGuest = online?.role === 'guest';
   const isHost = online?.role === 'host';
   const myIdx = isGuest ? 1 : 0;
+  const is2v2 = cfg.mode === '2v2';
 
   return (
     <div className="screen select">
       <h2 className="title sm">{online ? 'ห้องสู้ต่อสู้ออนไลน์' : 'เลือกนักสู้'}</h2>
+      <div className="chips">
+        {[['1v1', '⚔️ 1 vs 1 (สนามปกติ)'], ['2v2', '🔥 2 vs 2 (แมพใหญ่พิเศษ!)']].map(([m, lbl]) => (
+          <button key={m} disabled={isGuest} className={'chip' + ((cfg.mode || '1v1') === m ? ' on' : '')}
+            onClick={() => !isGuest && setCfg((c) => ({ ...c, mode: m }))}>
+            {lbl}
+          </button>
+        ))}
+        {!online && is2v2 && (
+          <button className={'chip' + (cfg.p2Ai ? ' on' : '')} onClick={() => setCfg((c) => ({ ...c, p2Ai: !c.p2Ai }))}>
+            {cfg.p2Ai ? '🤖 ฝั่งขวา: บอท 2 ตัว' : '👥 ฝั่งขวา: P2 + บอท'}
+          </button>
+        )}
+      </div>
       {online && (
         <div className="online-bar">
           <span>รหัสห้อง:</span>

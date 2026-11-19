@@ -149,7 +149,12 @@ button { font-family: inherit; cursor: pointer; }
 .pill.ok { background: #1b5e20; color: #b9f6ca; }
 .pill.wait { background: #4a2c00; color: #ffe082; }
 .panel.locked { opacity: .78; }
-.panel.locked .swatches button, .panel.locked .skins button, .panel.locked .chars button, .panel.locked .skills button, .panel.locked .mini { pointer-events: none; }
+.panel.locked .swatches button, .panel.locked .skins button, .panel.locked .chars button, .panel.locked .skills button, .panel.locked .mini, .panel.locked .ally-chip { pointer-events: none; }
+.ally-box { margin-top: 10px; padding-top: 8px; border-top: 1px solid #ffffff20; }
+.ally-lbl { display: block; font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+.ally-list { display: flex; gap: 5px; flex-wrap: wrap; max-height: 76px; overflow-y: auto; }
+.ally-chip { --k: #fff; background: #ffffff10; color: #fff; border: 1px solid #ffffff28; border-left: 3px solid var(--k); padding: 3px 8px; font-size: 11px; font-weight: 600; }
+.ally-chip.on { background: var(--k); color: #000; border-color: var(--k); }
 .arena-net { position: absolute; left: 8px; bottom: 8px; background: #000a; border: 1px solid #fff3; padding: 3px 10px; font-size: 11px; color: #cfd8dc; pointer-events: none; }
 
 /* ---------- อนิเมชั่นหน้า Intro และหน้าหลัก ---------- */
