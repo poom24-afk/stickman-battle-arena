@@ -5,11 +5,15 @@ const PREFIX = 'jjk-stickman-arena-';
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 const randCode = () => Array.from({ length: 5 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('');
 
-/* รองรับทั้ง P2P ข้ามอินเทอร์เน็ต (PeerJS WebRTC) และ WebSocket Server (/ws) */
+/* รองรับทั้ง P2P ข้ามอินเทอร์เน็ต (PeerJS WebRTC + TURN Relay) และ WebSocket Server (/ws) */
 export class NetClient {
   constructor() {
     this.mode = 'p2p';
@@ -94,12 +98,21 @@ export class NetClient {
     });
   }
 
+  keepAlivePeer(peer) {
+    peer.on('disconnected', () => {
+      if (!peer.destroyed && this.peer === peer) {
+        try { peer.reconnect(); } catch { /* ignore */ }
+      }
+    });
+  }
+
   createP2p(cfg, attempt = 0) {
     return new Promise((resolve, reject) => {
       const code = randCode();
-      const peer = new Peer(PREFIX + code, { config: { iceServers: ICE } });
+      const peer = new Peer(PREFIX + code, { config: { iceServers: ICE, iceCandidatePoolSize: 4 } });
       this.peer = peer;
       let opened = false;
+      this.keepAlivePeer(peer);
 
       peer.on('open', () => {
         opened = true;
@@ -111,19 +124,27 @@ export class NetClient {
 
       peer.on('connection', (conn) => {
         if (this.conn && this.conn.open) {
-          conn.on('open', () => {
+          const rejectBusy = () => {
             conn.send({ type: 'error', message: 'ห้องนี้เต็มแล้ว (2/2)' });
             setTimeout(() => conn.close(), 200);
-          });
+          };
+          if (conn.open) rejectBusy(); else conn.on('open', rejectBusy);
           return;
         }
         this.conn = conn;
-        conn.on('open', () => {
+        let readyFired = false;
+        const onReady = () => {
+          if (readyFired || this.conn !== conn) return;
+          readyFired = true;
           this.startPing();
           if (cfg) conn.send({ type: 'cfg-sync', cfg });
           this.emit({ type: 'peer-joined' });
-        });
+        };
+        if (conn.open) onReady(); else conn.on('open', onReady);
         conn.on('data', (data) => this.handleIncoming(data));
+        conn.on('error', (err) => {
+          this.emit({ type: 'error', message: `เชื่อมต่อเพื่อนไม่สำเร็จ (${err?.message || 'ICE failed'})` });
+        });
         conn.on('close', () => {
           clearInterval(this.pingTimer);
           if (this.conn === conn) {
@@ -147,21 +168,23 @@ export class NetClient {
 
   joinP2p(code) {
     return new Promise((resolve, reject) => {
-      const peer = new Peer({ config: { iceServers: ICE } });
+      const peer = new Peer({ config: { iceServers: ICE, iceCandidatePoolSize: 4 } });
       this.peer = peer;
       let connected = false;
+      this.keepAlivePeer(peer);
 
       const timer = setTimeout(() => {
         if (!connected) {
           this.close();
-          reject(new Error(`เชื่อมต่อห้อง "${code}" หมดเวลา (ตรวจสอบรหัสห้องหรือลองใช้โหมด Tunnel/Server)`));
+          reject(new Error(`เชื่อมต่อห้อง "${code}" หมดเวลา — ตรวจสอบรหัสห้อง หรือให้หัวหน้าห้องเปิดจากลิงก์ GitHub Pages`));
         }
-      }, 12000);
+      }, 20000);
 
       peer.on('open', () => {
-        const conn = peer.connect(PREFIX + code, { reliable: true });
+        const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
         this.conn = conn;
-        conn.on('open', () => {
+        const onOpen = () => {
+          if (connected) return;
           connected = true;
           clearTimeout(timer);
           this.role = 'guest';
@@ -169,7 +192,8 @@ export class NetClient {
           this.startPing();
           this.emit({ type: 'joined', code, mode: 'p2p' });
           resolve();
-        });
+        };
+        if (conn.open) onOpen(); else conn.on('open', onOpen);
         conn.on('data', (data) => {
           if (data?.type === 'error') {
             clearTimeout(timer);
@@ -177,6 +201,12 @@ export class NetClient {
             return;
           }
           this.handleIncoming(data);
+        });
+        conn.on('error', (err) => {
+          if (!connected) {
+            clearTimeout(timer);
+            reject(new Error(`เชื่อมต่อห้อง "${code}" ไม่สำเร็จ (${err?.message || 'WebRTC error'})`));
+          }
         });
         conn.on('close', () => {
           clearInterval(this.pingTimer);
@@ -192,7 +222,7 @@ export class NetClient {
         if (!connected) {
           const msg = err.type === 'peer-unavailable'
             ? `ไม่พบห้อง "${code}" (รหัสผิด หรือหัวหน้าห้องปิดหน้าต่างไปแล้ว)`
-            : 'เชื่อมต่อ P2P ไม่สำเร็จ กรุณาลองใหม่';
+            : `เชื่อมต่อ P2P ไม่สำเร็จ (${err.type || err.message})`;
           reject(new Error(msg));
         } else {
           this.emit({ type: 'error', message: `P2P Error: ${err.type || err.message}` });

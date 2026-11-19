@@ -196,6 +196,7 @@ export default function Select({ cfg, setCfg, onStart, onBack, online }) {
           {online.pingMs !== null && <span className="pill">Ping {online.pingMs}ms</span>}
         </div>
       )}
+      {online?.error && <p className="hint" style={{ opacity: 1, color: '#ff5252', fontWeight: 700 }}>{online.error}</p>}
       <div className="players">
         <Panel i={0} cfg={cfg} setCfg={setCfg}
           locked={!!online && myIdx !== 0}

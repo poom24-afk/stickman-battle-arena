@@ -160,7 +160,11 @@ export default function App() {
 
   const copyInvite = async () => {
     if (!netState) return;
-    const url = `${location.origin}${location.pathname}?room=${netState.code}&mode=${netState.mode || 'p2p'}`;
+    const isLocal = /^(localhost|127\.0\.0\.1|192\.168\.|10\.|26\.)/.test(location.hostname);
+    const base = isLocal && (netState.mode || 'p2p') === 'p2p'
+      ? 'https://poom24-afk.github.io/stickman-battle-arena/'
+      : `${location.origin}${location.pathname}`;
+    const url = `${base}?room=${netState.code}&mode=${netState.mode || 'p2p'}`;
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ }
   };
 
@@ -184,7 +188,7 @@ export default function App() {
         setCfg={netState ? updateCfgOnline : setCfg}
         onBack={() => (netState ? leaveOnline() : go('menu'))}
         onStart={fight}
-        online={netState ? { ...netState, copied, onToggleReady: toggleReady, onCopyLink: copyInvite } : null}
+        online={netState ? { ...netState, error: netErr, copied, onToggleReady: toggleReady, onCopyLink: copyInvite } : null}
       />
     );
   }
