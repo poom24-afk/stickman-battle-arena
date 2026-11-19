@@ -1,5 +1,5 @@
 import { W, H, GROUND, STAGE_L, STAGE_R, SKILLS, DOMAINS, ARENAS, CHARACTERS, SKINS, FONT } from './constants.js';
-import { loadControls, keyHints } from './keys.js';
+import { loadControls, keyHints, controlProfileOf } from './keys.js';
 import { sfx as rawSfx } from './audio.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -70,15 +70,16 @@ export class Game {
       { x: 1950, y1: 425, y2: GROUND, kind: this.arena.extra === 'sanctum' ? 'vine' : 'chain' },
     ] : (this.arena.climbs || []);
     this.keys = new Set();
-    this.controls = loadControls(); this.hints = keyHints(this.controls);
     this.net = cb.net || null;
     this.netRole = this.net?.role || null;
+    this.ctlProfile = controlProfileOf(cfg, !!this.net);
+    this.controls = loadControls(this.ctlProfile); this.hints = keyHints(this.controls);
     if (this.netRole === 'guest') this.hints[1] = this.hints[0];
     this.netEvents = []; this.remoteHeld = {}; this.remotePulse = {}; this.lastSync = 0; this.lastSentHeld = ''; this._lastShake = 0;
     this.sfx = this.netRole === 'host'
       ? Object.fromEntries(Object.keys(rawSfx).map((k) => [k, () => { rawSfx[k](); this.netEvents.push(['sfx', k]); }]))
       : rawSfx;
-    this.allKeys = new Set(this.controls.flatMap((c) => Object.values(c).flat()));
+    this.allKeys = new Set((this.netRole ? [this.controls[0]] : this.controls).flatMap((c) => Object.values(c).flat()));
     const mkFighter = (i, team, chId, skinId, load, domId, color, ai, tag) => {
       const ch = CHARACTERS[chId] || null;
       const skinList = (chId && SKINS[chId]) || [];

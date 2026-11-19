@@ -34,6 +34,7 @@ export default function App() {
   });
   const [result, setResult] = useState(null);
   const [round, setRound] = useState(0);
+  const [settingsProf, setSettingsProf] = useState(null);
 
   /* สถานะโหมดออนไลน์ */
   const netRef = useRef(null);
@@ -183,6 +184,7 @@ export default function App() {
       />
     );
   }
+  if (settingsProf) return <Settings initialProfile={settingsProf} onBack={() => { unlockAudio(); sfx.click(); setSettingsProf(null); }} />;
   if (screen === 'settings') return <Settings onBack={() => go('menu')} />;
   if (screen === 'lobby') return <OnlineLobby onCreate={createRoom} onJoin={joinRoom} onBack={() => go('menu')} connecting={connecting} error={netErr} />;
   if (screen === 'select') {
@@ -191,6 +193,7 @@ export default function App() {
         cfg={cfg}
         setCfg={netState ? updateCfgOnline : setCfg}
         onBack={() => (netState ? leaveOnline() : go('menu'))}
+        onSettings={(prof) => { unlockAudio(); sfx.click(); setSettingsProf(prof || '1v1'); }}
         onStart={fight}
         online={netState ? { ...netState, error: netErr, copied, onToggleReady: toggleReady, onCopyLink: copyInvite } : null}
       />
@@ -248,7 +251,7 @@ export default function App() {
       <div className="row menu-actions">
         <button className="btn big" onClick={() => go('select')}>เล่น 2 คน (เครื่องเดียว)</button>
         <button className="btn big" style={{ background: 'var(--violet)' }} onClick={() => go('lobby')}>เล่นออนไลน์</button>
-        <button className="btn big ghost" onClick={() => go('settings')}>ตั้งปุ่ม</button>
+        <button className="btn big ghost" onClick={() => { unlockAudio(); sfx.click(); setSettingsProf('1v1'); }}>ตั้งปุ่ม</button>
       </div>
       <div className="controls menu-controls">
         <div><h4>PLAYER 1</h4><p><Lines c={c1} /></p></div>

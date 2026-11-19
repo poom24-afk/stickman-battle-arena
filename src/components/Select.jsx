@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { COLORS, SKILLS, SKILL_IDS, DOMAINS, DOMAIN_IDS, ARENAS, CHARACTERS, CHAR_IDS, SKINS } from '../game/constants.js';
+import { controlProfileOf } from '../game/keys.js';
 
 const RANGED = new Set(['proj', 'beam', 'blue', 'dogs', 'strike', 'slashes', 'cutblast']);
 const CLOSE = new Set(['melee', 'cutmelee']);
@@ -196,7 +197,7 @@ function Panel({ i, cfg, setCfg, locked, badge }) {
   );
 }
 
-export default function Select({ cfg, setCfg, onStart, onBack, online }) {
+export default function Select({ cfg, setCfg, onStart, onBack, onSettings, online }) {
   const ready = cfg.loadouts.every((l) => l.length === 3);
   const isGuest = online?.role === 'guest';
   const isHost = online?.role === 'host';
@@ -256,6 +257,11 @@ export default function Select({ cfg, setCfg, onStart, onBack, online }) {
       </div>
       <div className="row">
         <button className="btn ghost" onClick={onBack}>{online ? 'ออกจากห้อง' : 'กลับ'}</button>
+        {onSettings && (
+          <button className="btn ghost" onClick={() => onSettings(controlProfileOf(cfg, !!online))}>
+            ⚙ ตั้งปุ่ม ({is2v2 ? (online ? '2v2 Online' : '2v2 Offline') : '1v1'})
+          </button>
+        )}
         {!online && <button className="btn big" onClick={onStart} disabled={!ready}>สู้เลย!</button>}
         {isHost && (
           <button className="btn big" onClick={onStart} disabled={!ready || !online.peerConnected || !online.peerReady}>

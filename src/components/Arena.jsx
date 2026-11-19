@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Game } from '../game/game.js';
-import { loadControls } from '../game/keys.js';
+import { loadControls, controlProfileOf } from '../game/keys.js';
 
 const BTN = [['◀', 'left'], ['▶', 'right'], ['▲', 'jump'], ['🛡', 'block'], ['👊', 'punch'], ['🦶', 'kick'], ['①', 's1'], ['②', 's2'], ['③', 's3'], ['領', 'dom']];
 
 export default function Arena({ cfg, onEnd, onExit, online }) {
   const ref = useRef(null), game = useRef(null);
   const [paused, setPaused] = useState(false);
-  const ctl = useMemo(() => loadControls(), []);
+  const profile = controlProfileOf(cfg, !!online);
+  const ctl = useMemo(() => loadControls(profile), [profile]);
   useEffect(() => {
     const g = new Game(ref.current, cfg, {
       onEnd,
