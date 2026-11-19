@@ -548,7 +548,15 @@ export class Game {
     } else if (sp.kind === 'blue') {
       this.sfx.blue(); this.orbs.push({ x: f.x + f.face * 150, y: f.y - 70, t: 0, hold: sp.hold, owner: f.i, color: col, tick: 0.2, dmg: sp.dmg, kb: sp.kb });
     } else if (sp.kind === 'warp') {
-      this.sfx.warp(); this.pushAfter(f, col); this.pushAfter(o, col);
+      this.sfx.warp(); this.ring(f.x, f.y - 70, 110, col);
+      if (o.inv > 0 || o.ko || o.ghost) return;
+      if (o.parryT > 0 || o.blocking) {
+        this.ring(o.x, o.y - 70, 110, '#4fc3f7');
+        this.hit(f, o, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col });
+        if (o.blocking) this.texts.push({ txt: 'SWAP BLOCKED!', x: o.x, y: o.y - 150, t: 0.65, max: 0.65, color: '#4fc3f7', size: 28 });
+        return;
+      }
+      this.pushAfter(f, col); this.pushAfter(o, col);
       const tx = o.x, ty = o.y; o.x = f.x; o.y = f.y; f.x = tx; f.y = ty; f.face = o.x >= f.x ? 1 : -1;
       this.ring(f.x, f.y - 70, 110, col); this.ring(o.x, o.y - 70, 110, col); this.spark(f.x, f.y - 70, 20, col, 300, 0.5, 5, 0);
       this.hit(f, o, { dmg: sp.dmg, kb: sp.kb, stun: sp.stun, big: false, color: col });
