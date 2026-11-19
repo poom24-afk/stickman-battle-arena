@@ -381,7 +381,7 @@ export class Game {
     if (this.cutscene) return;
 
     const domSpd = da
-      ? (da.ability === 'slow' && !da.isOwner ? 0.55 : da.ability === 'fever' && da.isOwner ? 1.25 : da.ability === 'fps' && da.isOwner ? 1.35 : 1)
+      ? (da.ability === 'slow' && !da.isOwner ? 0.55 : da.ability === 'fever' && da.isOwner ? 1.25 : da.ability === 'fps' && da.isOwner ? 1.35 : da.ability === 'blitz' && da.isOwner ? 1.45 : 1)
       : 1;
 
     if (can && !busy && f.climbing) {
@@ -784,15 +784,41 @@ export class Game {
           this.spark(o.x, o.y - 80, 6, D.color, 200, 0.35, 4, 0);
         }
         if (D.ability === 'drain') { o.ce = Math.max(0, o.ce - 6); f.hp = Math.min(100, f.hp + 0.9); }
-        if (D.ability === 'guilty') { o.ce = 0; }
+        if (D.ability === 'guilty' || D.ability === 'nullzone') { o.ce = 0; }
       }
       if (D.ability === 'fever') f.hp = Math.min(100, f.hp + 2.6 * dt);
-      if (D.ability === 'mutual') f.hp = Math.min(100, f.hp + 1.5 * dt);
+      if (D.ability === 'mutual' || D.ability === 'bloodorb') f.hp = Math.min(100, f.hp + 1.5 * dt);
       if (d.specT <= 0 && !o.ko) {
         if (D.ability === 'slash') {
           d.specT = 0.7;
           this.slashes.push({ x: o.x + rnd(-50, 50), y: o.y - rnd(20, 120), a: rnd(-1.4, 1.4), len: 240, t: 0.22, max: 0.22, color: '#ff1744' });
           this.sfx.slash();
+        } else if (D.ability === 'blitz') {
+          d.specT = 0.85;
+          this.slashes.push({ x: o.x + rnd(-40, 40), y: o.y - rnd(30, 110), a: rnd(-1.2, 1.2), len: 260, t: 0.24, max: 0.24, color: '#7dff6b' });
+          this.sfx.slash();
+        } else if (D.ability === 'nails') {
+          d.specT = 1.15;
+          const fromL = Math.random() < 0.5, sx = fromL ? 90 : W - 90, dir = fromL ? 1 : -1;
+          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 820, owner: f.i, color: '#ff6bd6', style: 'nail', life: 1.7, r: 16, dmg: 5, kb: 220, stun: 0.2, small: true, face: dir, arrow: true });
+          this.sfx.shoot();
+        } else if (D.ability === 'bloodorb') {
+          d.specT = 1.25;
+          const fromL = o.x > W / 2, sx = fromL ? 100 : W - 100, dir = fromL ? 1 : -1;
+          this.proj.push({ x: sx, y: o.y - 75, sx, sy: o.y - 75, vx: dir * 560, owner: f.i, color: '#ff2d55', style: 'red', life: 2.0, r: 22, dmg: 5, kb: 320, stun: 0.25, small: true, face: dir, boom: 55 });
+          this.sfx.shoot();
+        } else if (D.ability === 'echo') {
+          d.specT = 1.5;
+          o.stun = Math.max(o.stun, 0.45); o.vx = 0; this.ring(o.x, o.y - 80, 140, '#3dd6ff'); this.sfx.speech();
+          this.texts.push({ txt: 'STOP!', x: o.x, y: o.y - 165, t: 0.55, max: 0.55, color: '#fff', size: 26 });
+        } else if (D.ability === 'clapfest') {
+          d.specT = 1.65;
+          if (!o.blocking && o.inv <= 0 && !o.ledge) {
+            this.sfx.warp(); this.pushAfter(f, '#ff8a3d'); this.pushAfter(o, '#ff8a3d');
+            const tx = o.x, ty = o.y; o.x = f.x; o.y = f.y; f.x = tx; f.y = ty; f.face = o.x >= f.x ? 1 : -1;
+            this.ring(f.x, f.y - 70, 100, '#ff8a3d'); this.ring(o.x, o.y - 70, 100, '#ff8a3d');
+            this.texts.push({ txt: 'CLAP!', x: f.x, y: f.y - 150, t: 0.5, max: 0.5, color: '#ff8a3d', size: 28 });
+          }
         } else if (D.ability === 'lava') {
           d.specT = 1.35;
           const tx = o.x, ty = o.floorY !== null ? o.floorY : GROUND;
@@ -884,20 +910,20 @@ export class Game {
     this.impulse(o, dir * (tk.final ? 520 : 80), tk.final ? 420 : 120);
     this.spark(o.x, o.y - 80, tk.final ? 40 : 12, col, tk.final ? 500 : 280, 0.5, 5);
     this.sfx.hit(); this.shake = tk.final ? 22 : 6;
-    if (d.id === 'void' || d.id === 'moon') { this.flash = { t: 0.1, max: 0.1, c: col }; this.zaps.push({ x: o.x, y: o.y - 80, t: 0.2, color: col }); }
-    if (d.id === 'shrine') for (let i = 0; i < 3; i++) this.slashes.push({ x: o.x + rnd(-120, 120), y: o.y - rnd(0, 130), a: rnd(-1.4, 1.4), len: rnd(300, 520), t: 0.25, max: 0.25, color: '#ff5252' });
+    if (d.id === 'void' || d.id === 'moon' || d.id === 'soulhome' || d.id === 'cursedvoice') { this.flash = { t: 0.1, max: 0.1, c: col }; this.zaps.push({ x: o.x, y: o.y - 80, t: 0.2, color: col }); }
+    if (d.id === 'shrine' || d.id === 'armory' || d.id === 'zerovoid' || d.id === 'strawfield') for (let i = 0; i < 3; i++) this.slashes.push({ x: o.x + rnd(-120, 120), y: o.y - rnd(0, 130), a: rnd(-1.4, 1.4), len: rnd(300, 520), t: 0.25, max: 0.25, color: col });
     if (d.id === 'coffin' || d.id === 'singularity') { this.pillars.push({ x: o.x + rnd(-30, 30), y: GROUND, t: 0.6, max: 0.6, color: col }); this.sfx.boom(); }
     if (d.id === 'chimera') { this.pillars.push({ x: o.x + rnd(-50, 50), y: GROUND, t: 0.45, max: 0.45, color: '#7c4dff', w: 26 }); this.zaps.push({ x: o.x, y: o.y - 60, t: 0.15, color: '#b388ff' }); }
-    if (d.id === 'sentence' || d.id === 'womb' || d.id === 'sphere') this.rings.push({ x: o.x, y: GROUND, r: 200, t: 0.3, max: 0.3, color: col });
-    if (d.id === 'skandha') { this.rings.push({ x: o.x + rnd(-80, 80), y: o.y - rnd(20, 120), r: 90, t: 0.3, max: 0.3, color: col }); this.spark(o.x, o.y - 70, 6, '#b3e5fc', 220, 0.5, 4, -200); }
+    if (d.id === 'sentence' || d.id === 'womb' || d.id === 'sphere' || d.id === 'overtime73' || d.id === 'claphall') this.rings.push({ x: o.x, y: GROUND, r: 200, t: 0.3, max: 0.3, color: col });
+    if (d.id === 'skandha' || d.id === 'bloodsea') { this.rings.push({ x: o.x + rnd(-80, 80), y: o.y - rnd(20, 120), r: 90, t: 0.3, max: 0.3, color: col }); this.spark(o.x, o.y - 70, 6, col, 220, 0.5, 4, -200); }
     if (d.id === 'mutual') { this.slashes.push({ x: o.x + rnd(-60, 60), y: o.y - rnd(10, 130), a: rnd(-1, 1), len: 320, t: 0.22, max: 0.22, color: '#ff6bd6' }); this.zaps.push({ x: o.x, y: o.y - 80, t: 0.15, color: '#fff' }); }
     if (tk.final) {
       this.ring(o.x, o.y - 80, 260, col); this.freeze = 0.12; this.flash = { t: 0.25, max: 0.25, c: '#fff' };
       o.vx = dir * 480; o.vy = -420; o.grounded = false; o.ragdollT = 0.65;
       const perfect = d.perfect >= BEAT_N;
       this.texts.push({ txt: perfect ? 'PERFECT DOMAIN!' : 'DOMAIN COMPLETE', x: o.x, y: o.y - 170, t: 1.0, max: 1.0, color: perfect ? '#ffd24a' : col, size: perfect ? 42 : 34 });
-      if (d.id === 'sentence') { o.cd = o.cd.map((v) => v + 6); o.ce = 0; this.texts.push({ txt: 'GUILTY! TECHNIQUE CONFISCATED', x: o.x, y: o.y - 215, t: 1.2, max: 1.2, color: '#ffca28', size: 26 }); this.sfx.gavel(); }
-      if (d.id === 'mutual') { f.hp = Math.min(100, f.hp + 8); this.texts.push({ txt: '+8 HP', x: f.x, y: f.y - 170, t: 1, max: 1, color: '#ff6bd6', size: 32 }); }
+      if (d.id === 'sentence' || d.id === 'zerovoid') { o.cd = o.cd.map((v) => v + 6); o.ce = 0; this.texts.push({ txt: d.id === 'zerovoid' ? 'TECHNIQUE SEALED!' : 'GUILTY! TECHNIQUE CONFISCATED', x: o.x, y: o.y - 215, t: 1.2, max: 1.2, color: col, size: 26 }); this.sfx.gavel(); }
+      if (d.id === 'mutual' || d.id === 'bloodsea') { f.hp = Math.min(100, f.hp + 8); this.texts.push({ txt: '+8 HP', x: f.x, y: f.y - 170, t: 1, max: 1, color: col, size: 32 }); }
     }
   }
   hit(att, def, o) {
@@ -932,12 +958,16 @@ export class Game {
     /* คอมโบหมัดที่ 3 ซัดกระเด็นล้มเป็น Ragdoll! */
     const finisher = o.basic && att.combo >= 2;
     if (finisher) { o.dmg *= 1.35; o.kb = Math.max(o.kb, 620); o.vy = 360; o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.85; o.big = true; }
-    if (o.basic && att.pas.bf && Math.random() < att.pas.bf) { o.fx = 'bf'; o.dmg *= 2.2; o.kb = Math.max(o.kb, 750); o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.9; o.big = true; o.color = '#ff1744'; }
     const da = this.domAbility(att);
-    const domDmg = da && da.isOwner ? (da.ability === 'guilty' ? 1.25 : da.ability === 'mutual' ? 1.2 : da.ability === 'pull' && o.basic ? 1.35 : 1) : 1;
+    const bfChance = (att.pas.bf || 0) + (da && da.isOwner && da.ability === 'bfzone' ? 0.35 : 0);
+    if (o.basic && bfChance > 0 && Math.random() < bfChance) { o.fx = 'bf'; o.dmg *= 2.2; o.kb = Math.max(o.kb, 750); o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.9; o.big = true; o.color = '#ff1744'; }
+    const domDmg = da && da.isOwner
+      ? (da.ability === 'guilty' ? 1.25 : da.ability === 'nullzone' ? 1.4 : da.ability === 'mutual' ? 1.2 : (da.ability === 'pull' || da.ability === 'clapfest') && o.basic ? 1.35 : 1)
+      : 1;
     let dmg = o.dmg * (1 + Math.min(att.combo, 4) * 0.08) * (att.pas.dmg || 1) * (att.amp > 0 ? att.ampMul : 1) * domDmg * (def.pas.guard || 1);
     if (o.basic && att.pas.basic) dmg *= att.pas.basic;
-    if (att.pas.crit && Math.random() < att.pas.crit) { dmg *= 1.6; this.texts.push({ txt: 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
+    const critChance = da && da.isOwner && da.ability === 'ratio73' ? 1 : (att.pas.crit || 0) + (da && da.isOwner && da.ability === 'nails' ? 0.3 : 0);
+    if (critChance > 0 && Math.random() < critChance) { dmg *= 1.6; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
     def.stun = Math.max(def.stun, o.stun); def.act = null; def.inv = 0.2; def.flash = 0.12;
     if (o.ragdoll || o.kb >= 520) def.ragdollT = Math.max(def.ragdollT, o.ragdoll || 0.72);
@@ -1517,6 +1547,43 @@ export class Game {
       c.fillStyle = '#000'; c.beginPath(); c.arc(W / 2, 270, 72, 0, 7); c.fill();
       c.strokeStyle = '#00e5ff'; c.lineWidth = 3; c.beginPath(); c.ellipse(W / 2, 270, 190, 42, -0.25, 0, 7); c.stroke();
       c.fillStyle = '#000814'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'soulhome') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#180c06'); g.addColorStop(1, '#5e2c14'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      this.drawOrb(W / 2, 250, 190, '#ff8a3d');
+      c.strokeStyle = '#ffd24a'; c.lineWidth = 2; c.globalAlpha = a * 0.45;
+      for (let i = 0; i < 6; i++) { const y = 140 + i * 70; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+      c.fillStyle = '#120804'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'strawfield') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1e071a'); g.addColorStop(1, '#591642'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      this.drawOrb(W / 2, 260, 180, '#ff6bd6');
+      c.strokeStyle = '#ffab91'; c.lineWidth = 3; c.globalAlpha = a * 0.5;
+      for (let i = 0; i < 8; i++) { const x = 100 + i * 155, y = 160 + (i % 3) * 70; c.beginPath(); c.moveTo(x - 16, y - 22); c.lineTo(x + 16, y + 22); c.moveTo(x + 16, y - 22); c.lineTo(x - 16, y + 22); c.stroke(); }
+      c.fillStyle = '#140310'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'overtime73') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#151205'); g.addColorStop(1, '#473c0f'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      c.strokeStyle = '#ffd24a'; c.lineWidth = 2; c.globalAlpha = a * 0.45;
+      c.beginPath(); c.arc(W / 2, 240, 140, 0, 7); c.stroke();
+      for (let i = 0; i < 10; i++) { const x = i * 128 + 64; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, GROUND); c.stroke(); }
+      c.fillStyle = '#0f0c03'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'armory' || id === 'zerovoid') {
+      const col = id === 'armory' ? '#7dff6b' : '#ffffff';
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#070a0d'); g.addColorStop(1, id === 'armory' ? '#144723' : '#2b2e3b'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      c.strokeStyle = col; c.lineWidth = 4; c.globalAlpha = a * 0.55;
+      for (let i = 0; i < 9; i++) { const x = 90 + i * 140; c.beginPath(); c.moveTo(x, GROUND); c.lineTo(x + (i % 2 ? 18 : -18), GROUND - 150 - (i % 3) * 40); c.stroke(); }
+      c.fillStyle = '#05070a'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'cursedvoice') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#03111c'); g.addColorStop(1, '#0b3859'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      c.strokeStyle = '#3dd6ff'; c.lineWidth = 3; c.globalAlpha = a * 0.55;
+      for (let i = 0; i < 5; i++) { const r = ((t * 180 + i * 90) % 450) + 40; c.beginPath(); c.arc(W / 2, 260, r, 0, 7); c.stroke(); }
+      c.fillStyle = '#020b14'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'claphall') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1a0826'); g.addColorStop(1, '#5c2612'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      this.drawOrb(W * 0.3, 240, 150, '#ff8a3d'); this.drawOrb(W * 0.7, 240, 150, '#ff6bd6');
+      c.fillStyle = '#12041a'; c.fillRect(0, GROUND, W, H - GROUND);
+    } else if (id === 'bloodsea') {
+      const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1c0208'); g.addColorStop(1, '#6e0719'); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
+      this.drawOrb(W / 2, 250, 190, '#ff2d55');
+      c.fillStyle = '#4a000d'; c.fillRect(0, GROUND - 8, W, H - GROUND + 8);
     } else {
       const info = DOMAINS[id], g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, info.bg[0]); g.addColorStop(1, info.bg[1]); c.fillStyle = g; c.fillRect(-30, -30, W + 60, H + 60);
       this.drawOrb(W / 2, 280, 200 + Math.sin(t * 6) * 12, info.color);
