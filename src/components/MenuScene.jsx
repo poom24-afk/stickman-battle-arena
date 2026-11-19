@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FONT } from '../game/constants.js';
 import { sfx, unlockAudio } from '../game/audio.js';
 
@@ -121,24 +121,32 @@ export function MenuBgCanvas() {
   return <canvas ref={ref} className="menu-canvas" aria-hidden="true" />;
 }
 
-/* หน้าตอนเปิดเข้าเกม (Cinematic Opening Splash) */
-export function OpeningIntro({ onDone }) {
+/* หน้าตอนเปิดเข้าเกม (Cinematic Opening Splash + Transition ฟันเปิดม่านสู่หน้าหลัก) */
+export function OpeningIntro({ onReveal, onDone }) {
   const ref = useRef(null);
+  const exitAtRef = useRef(null);
   const doneRef = useRef(false);
+  const [exiting, setExiting] = useState(false);
 
-  const finish = (withSound) => {
-    if (doneRef.current) return;
-    doneRef.current = true;
-    if (withSound) { unlockAudio(); sfx.fight(); }
-    onDone();
+  const beginExit = (withSound) => {
+    if (exitAtRef.current !== null || doneRef.current) return;
+    exitAtRef.current = performance.now();
+    setExiting(true);
+    if (withSound) { unlockAudio(); sfx.slash(); }
+    onReveal?.();
+    setTimeout(() => {
+      if (doneRef.current) return;
+      doneRef.current = true;
+      onDone();
+    }, 650);
   };
 
   useEffect(() => {
     const onKey = (e) => {
-      if (['Enter', 'Space', 'Escape'].includes(e.code)) { e.preventDefault(); finish(true); }
+      if (['Enter', 'Space', 'Escape'].includes(e.code)) { e.preventDefault(); beginExit(true); }
     };
     addEventListener('keydown', onKey);
-    const autoTimer = setTimeout(() => finish(false), 3600);
+    const autoTimer = setTimeout(() => beginExit(false), 3100);
 
     const cv = ref.current;
     const c = cv?.getContext('2d');
@@ -155,68 +163,95 @@ export function OpeningIntro({ onDone }) {
       const w = (cv.width = cv.clientWidth || window.innerWidth);
       const h = (cv.height = cv.clientHeight || window.innerHeight);
       const cx = w / 2, cy = h / 2;
+      const ex = exitAtRef.current !== null ? Math.min(1, (now - exitAtRef.current) / 650) : 0;
 
-      c.fillStyle = '#05020b'; c.fillRect(0, 0, w, h);
+      c.clearRect(0, 0, w, h);
 
-      /* วงเวท Domain & พลังสาปรวมศูนย์ */
-      c.save(); c.translate(cx, cy);
-      const rot = t * 0.7;
-      c.rotate(rot);
-      c.globalAlpha = Math.min(0.42, t * 0.5);
-      c.strokeStyle = '#8b5cf6'; c.lineWidth = 2;
-      const R = Math.min(w, h) * 0.34;
-      c.beginPath(); c.arc(0, 0, R, 0, 7); c.stroke();
-      c.beginPath(); c.arc(0, 0, R * 0.76, 0, 7); c.stroke();
-      c.strokeRect(-R * 0.65, -R * 0.65, R * 1.3, R * 1.3);
-      c.rotate(Math.PI / 4);
-      c.strokeRect(-R * 0.65, -R * 0.65, R * 1.3, R * 1.3);
-      c.restore();
+      /* แยกพื้นหลังสีดำออกเป็น 2 ซีกแนวทแยงตอน Transition */
+      const ease = 1 - Math.pow(1 - ex, 3);
+      const slideX = ease * w * 0.85, slideY = ease * h * 0.55;
+      const drawHalf = (pts, dx, dy) => {
+        c.save(); c.translate(dx, dy); c.beginPath();
+        pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py)));
+        c.closePath(); c.fillStyle = '#05020b'; c.fill(); c.restore();
+      };
+      if (ex === 0) {
+        c.fillStyle = '#05020b'; c.fillRect(0, 0, w, h);
+      } else {
+        drawHalf([[0, 0], [w, 0], [w, h * 0.32], [0, h * 0.68]], -slideX, -slideY);
+        drawHalf([[0, h * 0.68], [w, h * 0.32], [w, h], [0, h]], slideX, slideY);
+      }
 
-      /* อนุภาคหมุนเข้าและระเบิดออกตอน 0.85 วิ */
-      motes.forEach((m) => {
-        const prog = t < 0.85 ? 1 - t / 0.85 : (t - 0.85) * 1.6;
-        const rad = Math.max(8, m.r * prog + (t >= 0.85 ? 40 : 0));
-        const a = m.an + t * m.sp;
-        c.globalAlpha = t < 0.85 ? 0.85 : Math.max(0, 0.9 - (t - 0.85) * 0.4);
-        c.fillStyle = m.col;
-        c.fillRect(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, m.sz, m.sz);
-      });
-      c.globalAlpha = 1;
+      /* วงเวทและข้อความ Intro ค่อยๆ จาง+ขยายออกตอน Transition */
+      const introAlpha = Math.max(0, 1 - ease * 1.4);
+      if (introAlpha > 0.01) {
+        c.save(); c.globalAlpha = introAlpha;
+        c.save(); c.translate(cx, cy);
+        c.rotate(t * 0.7);
+        c.globalAlpha = introAlpha * Math.min(0.42, t * 0.5);
+        c.strokeStyle = '#8b5cf6'; c.lineWidth = 2;
+        const R = Math.min(w, h) * 0.34 * (1 + ease * 0.35);
+        c.beginPath(); c.arc(0, 0, R, 0, 7); c.stroke();
+        c.beginPath(); c.arc(0, 0, R * 0.76, 0, 7); c.stroke();
+        c.strokeRect(-R * 0.65, -R * 0.65, R * 1.3, R * 1.3);
+        c.rotate(Math.PI / 4);
+        c.strokeRect(-R * 0.65, -R * 0.65, R * 1.3, R * 1.3);
+        c.restore();
 
-      /* รอยฟันผ่ากลางหน้าจอช่วง 0.75 - 1.35 วิ */
-      if (t >= 0.72 && t <= 1.45) {
-        const k = (t - 0.72) / 0.73;
-        c.save();
-        c.globalAlpha = 1 - k;
-        c.strokeStyle = '#fff'; c.shadowColor = '#3dd6ff'; c.shadowBlur = 32; c.lineWidth = (1 - k) * 18 + 2;
-        c.beginPath(); c.moveTo(0, cy + h * 0.14); c.lineTo(w, cy - h * 0.14); c.stroke();
-        c.strokeStyle = '#ff2d55'; c.lineWidth = (1 - k) * 9 + 1;
-        c.beginPath(); c.moveTo(0, cy - h * 0.10); c.lineTo(w, cy + h * 0.10); c.stroke();
+        motes.forEach((m) => {
+          const prog = t < 0.85 ? 1 - t / 0.85 : (t - 0.85) * 1.6;
+          const rad = Math.max(8, m.r * prog + (t >= 0.85 ? 40 : 0) + ease * 260);
+          const a = m.an + t * m.sp;
+          c.globalAlpha = introAlpha * (t < 0.85 ? 0.85 : Math.max(0, 0.9 - (t - 0.85) * 0.4));
+          c.fillStyle = m.col;
+          c.fillRect(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, m.sz, m.sz);
+        });
+        c.globalAlpha = introAlpha;
+
+        if (t >= 0.72 && t <= 1.45) {
+          const k = (t - 0.72) / 0.73;
+          c.save(); c.globalAlpha = introAlpha * (1 - k);
+          c.strokeStyle = '#fff'; c.shadowColor = '#3dd6ff'; c.shadowBlur = 32; c.lineWidth = (1 - k) * 18 + 2;
+          c.beginPath(); c.moveTo(0, cy + h * 0.14); c.lineTo(w, cy - h * 0.14); c.stroke();
+          c.strokeStyle = '#ff2d55'; c.lineWidth = (1 - k) * 9 + 1;
+          c.beginPath(); c.moveTo(0, cy - h * 0.10); c.lineTo(w, cy + h * 0.10); c.stroke();
+          c.restore();
+        }
+
+        if (t >= 0.82 && t <= 1.25) {
+          const fk = 1 - (t - 0.82) / 0.43;
+          c.fillStyle = `rgba(255, 255, 255, ${fk * 0.45 * introAlpha})`;
+          c.fillRect(0, 0, w, h);
+        }
+
+        if (t >= 0.92) {
+          const p = Math.min(1, (t - 0.92) / 0.35);
+          const sc = (1 + (1 - p) * 0.6) * (1 + ease * 0.25);
+          c.save(); c.translate(cx, cy - 10); c.scale(sc, sc);
+          c.globalAlpha = p * introAlpha; c.textAlign = 'center'; c.textBaseline = 'middle';
+          c.font = `${Math.min(28, w * 0.04)}px ${FONT}`;
+          c.fillStyle = '#3dd6ff'; c.shadowColor = '#3dd6ff'; c.shadowBlur = 18;
+          c.fillText('呪 力 闘 技 場', 0, -86);
+          c.shadowBlur = 0; c.lineJoin = 'round'; c.lineWidth = 10; c.strokeStyle = '#000';
+          const big = Math.min(92, w * 0.11);
+          c.font = `${big}px ${FONT}`;
+          c.strokeText('STICKMAN', 0, -24); c.fillStyle = '#f3efe6'; c.fillText('STICKMAN', 0, -24);
+          c.shadowColor = '#ff2d55'; c.shadowBlur = 24;
+          c.strokeText('BATTLE', 0, big * 0.72); c.fillStyle = '#ffffff'; c.fillText('BATTLE', 0, big * 0.72);
+          c.restore();
+        }
         c.restore();
       }
 
-      /* ระเบิดแสงวาบตอน 0.85 วิ */
-      if (t >= 0.82 && t <= 1.25) {
-        const fk = 1 - (t - 0.82) / 0.43;
-        c.fillStyle = `rgba(255, 255, 255, ${fk * 0.45})`;
-        c.fillRect(0, 0, w, h);
-      }
-
-      /* ข้อความกลางจอหลังจากปะทะ */
-      if (t >= 0.92) {
-        const p = Math.min(1, (t - 0.92) / 0.35);
-        const sc = 1 + (1 - p) * 0.6;
-        c.save(); c.translate(cx, cy - 10); c.scale(sc, sc);
-        c.globalAlpha = p; c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.font = `${Math.min(28, w * 0.04)}px ${FONT}`;
-        c.fillStyle = '#3dd6ff'; c.shadowColor = '#3dd6ff'; c.shadowBlur = 18;
-        c.fillText('呪 力 闘 技 場', 0, -86);
-        c.shadowBlur = 0; c.lineJoin = 'round'; c.lineWidth = 10; c.strokeStyle = '#000';
-        const big = Math.min(92, w * 0.11);
-        c.font = `${big}px ${FONT}`;
-        c.strokeText('STICKMAN', 0, -24); c.fillStyle = '#f3efe6'; c.fillText('STICKMAN', 0, -24);
-        c.shadowColor = '#ff2d55'; c.shadowBlur = 24;
-        c.strokeText('BATTLE', 0, big * 0.72); c.fillStyle = '#ffffff'; c.fillText('BATTLE', 0, big * 0.72);
+      /* เส้นฟันสีฟ้า-แดงสว่างวาบตามแนวตัดตอน Transition เปิดสู่หน้า Menu */
+      if (ex > 0) {
+        const sk = 1 - ex;
+        c.save();
+        c.globalAlpha = sk;
+        c.strokeStyle = '#fff'; c.shadowColor = '#3dd6ff'; c.shadowBlur = 36; c.lineWidth = sk * 22 + 2;
+        c.beginPath(); c.moveTo(0, h * 0.68); c.lineTo(w, h * 0.32); c.stroke();
+        c.strokeStyle = '#ff2d55'; c.lineWidth = sk * 10;
+        c.beginPath(); c.moveTo(0, h * 0.68 + 6); c.lineTo(w, h * 0.32 - 6); c.stroke();
         c.restore();
       }
 
@@ -232,7 +267,13 @@ export function OpeningIntro({ onDone }) {
   }, []); // eslint-disable-line
 
   return (
-    <div className="intro-screen" onClick={() => finish(true)} role="button" tabIndex={0} aria-label="เข้าสู่หน้าหลักเกม">
+    <div
+      className={'intro-screen' + (exiting ? ' exiting' : '')}
+      onClick={() => beginExit(true)}
+      role="button"
+      tabIndex={0}
+      aria-label="เข้าสู่หน้าหลักเกม"
+    >
       <canvas ref={ref} className="intro-canvas" />
       <p className="intro-skip">คลิกหรือกด Enter / Space เพื่อเข้าสู่เกม</p>
     </div>

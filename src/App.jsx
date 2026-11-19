@@ -22,6 +22,7 @@ const fighterName = (cfg, i) => CHARACTERS[cfg.chars[i]]?.name || `PLAYER ${i + 
 
 export default function App() {
   const [screen, setScreen] = useState(() => (new URLSearchParams(location.search).get('room') ? 'lobby' : 'intro'));
+  const [menuRevealed, setMenuRevealed] = useState(false);
   const [cfg, setCfg] = useState(() => {
     const [a, b] = [start('gojo'), start('sukuna')];
     return {
@@ -163,7 +164,6 @@ export default function App() {
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ }
   };
 
-  if (screen === 'intro') return <OpeningIntro onDone={() => setScreen('menu')} />;
   if (screen === 'arena') {
     return (
       <Arena
@@ -217,8 +217,9 @@ export default function App() {
     );
   }
   const [c1, c2] = loadControls();
+  const inIntro = screen === 'intro';
   return (
-    <div className="screen menu">
+    <div className={'screen menu' + (menuRevealed ? ' revealed' : '')}>
       <MenuBgCanvas />
       <div className="ghost-kanji" aria-hidden="true">呪</div>
       <svg className="sigil" viewBox="0 0 400 400" aria-hidden="true">
@@ -230,7 +231,7 @@ export default function App() {
           <rect x="95" y="95" width="210" height="210" strokeWidth="2" transform="rotate(45 200 200)" />
         </g>
       </svg>
-      <button className="intro-replay" onClick={() => { unlockAudio(); sfx.click(); setScreen('intro'); }}>▶ ดู Intro</button>
+      <button className="intro-replay" onClick={() => { unlockAudio(); sfx.click(); setMenuRevealed(false); setScreen('intro'); }}>▶ ดู Intro</button>
       <header className="lockup">
         <p className="jp-sub">呪力闘技場</p>
         <h1 className="logo"><span className="l1">STICKMAN</span><span className="l2">BATTLE</span></h1>
@@ -249,6 +250,7 @@ export default function App() {
         กดป้องกันตรงจังหวะ = Parry · ใกล้ตกขอบแมพ กดกระโดด/ต่อยรัวๆ (QTE) เพื่อดึงตัวขึ้น ·
         เปิด Domain เสร็จอาณาเขตจะค้างต่อ 4 วิ พร้อมความสามารถพิเศษและสู้กันต่อข้างในได้! · Esc / P = หยุดเกม
       </p>
+      {inIntro && <OpeningIntro onReveal={() => setMenuRevealed(true)} onDone={() => { setMenuRevealed(false); setScreen('menu'); }} />}
     </div>
   );
 }

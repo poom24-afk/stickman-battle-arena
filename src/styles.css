@@ -153,9 +153,13 @@ button { font-family: inherit; cursor: pointer; }
 .arena-net { position: absolute; left: 8px; bottom: 8px; background: #000a; border: 1px solid #fff3; padding: 3px 10px; font-size: 11px; color: #cfd8dc; pointer-events: none; }
 
 /* ---------- อนิเมชั่นหน้า Intro และหน้าหลัก ---------- */
-.intro-screen { position: fixed; inset: 0; background: #05020b; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; animation: introFade .4s ease-out; }
+.intro-screen { position: fixed !important; inset: 0; z-index: 30 !important; background: transparent; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; animation: introFade .35s ease-out; }
 .intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.intro-skip { position: relative; z-index: 2; margin-bottom: 28px; font-size: 13px; letter-spacing: .1em; opacity: .78; padding: 6px 16px; background: #0009; border: 1px solid #ffffff33; animation: blink .85s infinite alternate; }
+.intro-skip { position: relative; z-index: 2; margin-bottom: 28px; font-size: 13px; letter-spacing: .1em; opacity: .78; padding: 6px 16px; background: #0009; border: 1px solid #ffffff33; animation: blink .85s infinite alternate; transition: opacity .25s; }
+.intro-screen.exiting { pointer-events: none; }
+.intro-screen.exiting .intro-skip { opacity: 0; animation: none; }
+.menu.revealed .lockup, .menu.revealed .menu-actions, .menu.revealed .menu-controls, .menu.revealed .menu-hint { animation: menuBloom .6s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes menuBloom { from { opacity: 0; transform: scale(1.07) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes introFade { from { opacity: 0; } to { opacity: 1; } }
 
 .menu-canvas { position: absolute !important; inset: 0; width: 100%; height: 100%; z-index: 0 !important; pointer-events: none; }
