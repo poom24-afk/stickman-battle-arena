@@ -39,6 +39,27 @@ const WIN_QUOTES = {
   dagon: 'คลื่นทะเลลึกแห่งภัยพิบัติกลืนกินหมดแล้ว!',
   geto: 'วิญญาณคำสาปทั้งหมด จงสยบแทบเท้าข้า',
 };
+const FINISHERS = {
+  gojo: { jp: '虚式・茈', title: 'HOLLOW PURPLE · FINALE', style: 'hollow', color: '#d500f9' },
+  sukuna: { jp: '世界を断つ斬撃', title: 'WORLD CUTTING SLASH', style: 'bisect', color: '#ff2d55' },
+  yuji: { jp: '黒閃・極', title: 'MAXIMUM BLACK FLASH', style: 'bf3', color: '#ff1744' },
+  megumi: { jp: '布瑠部由良由良', title: 'CHIMERA SHADOW FINALE', style: 'mahoraga', color: '#c46bff' },
+  mahoraga: { jp: '八握剣・魔虚羅', title: 'DIVINE WHEEL OBLITERATION', style: 'mahoraga', color: '#ffd54f' },
+  nobara: { jp: '共鳴り・極', title: 'RESONANCE OVERKILL', style: 'soul', color: '#ff6bd6' },
+  nanami: { jp: '十劃呪法・７：３', title: 'CRITICAL RATIO 7:3', style: 'bisect', color: '#ffd24a' },
+  maki: { jp: '游雲・天与暴君', title: 'PLAYFUL CLOUD FINALE', style: 'bisect', color: '#7dff6b' },
+  toji: { jp: '天逆鉾・零', title: 'INVERTED SPEAR EXECUTION', style: 'bisect', color: '#ffffff' },
+  toge: { jp: '呪言・爆ぜろ', title: 'CURSED SPEECH: EXPLODE', style: 'speech', color: '#3dd6ff' },
+  todo: { jp: '不義遊戯・黒閃', title: 'BOOGIE BLACK FLASH', style: 'bf3', color: '#ff8a3d' },
+  yuta: { jp: '邪去悔の梯子', title: 'PURE LOVE · JACOB LADDER', style: 'jacob', color: '#ffffff' },
+  mahito: { jp: '無為転変・極', title: 'IDLE TRANSFIGURATION', style: 'soul', color: '#7dff6b' },
+  jogo: { jp: '極ノ番・隕', title: 'MAXIMUM METEOR', style: 'meteor', color: '#ff6d00' },
+  hakari: { jp: '大当たり・不死連撃', title: '777 FEVER FINISHER', style: 'gamble', color: '#ffd24a' },
+  choso: { jp: '穿血・超新星', title: 'SUPERNOVA PIERCING BLOOD', style: 'blood', color: '#ff1744' },
+  higuruma: { jp: '処刑人の剣', title: 'EXECUTIONER SWORD', style: 'gavel', color: '#ffd24a' },
+  dagon: { jp: '死累累湧軍', title: 'ABYSSAL TIDAL SWARM', style: 'uzumaki', color: '#3dd6ff' },
+  geto: { jp: '極ノ番・うずまき', title: 'MAXIMUM: UZUMAKI', style: 'uzumaki', color: '#c46bff' },
+};
 const NAMES = ['head', 'neck', 'hip', 'kF', 'kB', 'fF', 'fB', 'eF', 'eB', 'hF', 'hB'];
 const BONES = [['neck', 'head', 17], ['neck', 'hip', 40], ['hip', 'kF', 32], ['kF', 'fF', 32], ['hip', 'kB', 32], ['kB', 'fB', 32],
   ['neck', 'eF', 30], ['eF', 'hF', 30], ['neck', 'eB', 30], ['eB', 'hB', 30]];
@@ -217,13 +238,13 @@ export class Game {
       Object.assign(f, {
         x: sx, y: GROUND, _tx: sx, _ty: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
         parryT: 0, parryCd: 0, dropT: 0, dropCool: 0, climbing: false, floorY: GROUND, ragdollT: 0, ledge: null, ledgeCd: 0,
-        aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1,
+        aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1, lastHitBy: null,
         cd: [0, 0, 0], amp: 0, ampMul: 1, ampSpd: 1, ce: f.ce > 0 && this.round > 1 ? Math.min(60, f.ce) : 0, combo: 0, comboT: 0, flash: 0, anim: 0, grounded: true, ghost: false, ko: false, rag: 0, aura: 0, auraC: '#fff',
       });
       const T = this.targets(f, this.pose(f)); f.rig = {};
       NAMES.forEach((n) => (f.rig[n] = { x: T[n].x, y: T[n].y, ox: T[n].x, oy: T[n].y }));
     });
-    this.phase = 'countdown'; this.phaseT = 3; this.cnt = 4; this.timer = 99; this.msg = ''; this.dom = null; this.cutscene = null; this.victory = null;
+    this.phase = 'countdown'; this.phaseT = 3; this.cnt = 4; this.timer = 99; this.msg = ''; this.dom = null; this.cutscene = null; this.finisher = null; this.victory = null;
     this.parts = []; this.proj = []; this.rings = []; this.beams = []; this.slashes = []; this.arcs = []; this.orbs = []; this.zaps = [];
     this.pillars = []; this.texts = []; this.afters = []; this.warns = []; this.sched = []; this.flash = null;
   }
@@ -277,6 +298,19 @@ export class Game {
     return { ability: DOMAINS[d.id].ability, isOwner: (d.ownerTeam ?? (this.fighters[d.owner]?.team)) === f.team, dom: d };
   }
   updateCamera(dt) {
+    if (this.finisher) {
+      const ff = this.fighters[this.finisher.owner], fo = this.fighters[this.finisher.target];
+      if (ff && fo) {
+        const tz = 1.32;
+        const cx = clamp((ff.x + fo.x) / 2, W / (2 * tz) - 40, Math.max(W / (2 * tz) - 40, this.worldW - W / (2 * tz) + 40));
+        const cy = clamp((ff.y + fo.y) / 2 - 75, H / (2 * tz) - 20, H + 40 - H / (2 * tz));
+        const k = Math.min(1, dt * 8);
+        this.cam.z += (tz - this.cam.z) * k;
+        this.cam.x += (cx - this.cam.x) * k;
+        this.cam.y += (cy - this.cam.y) * k;
+        return;
+      }
+    }
     if (this.victory) {
       const wf = this.fighters[this.victory.idx];
       if (wf) {
@@ -456,6 +490,7 @@ export class Game {
       })),
     };
     if (this.victory) snap.victory = this.victory;
+    if (this.finisher) snap.finisher = this.finisher;
     if (this.proj.length) snap.proj = this.proj;
     if (this.orbs.length) snap.orbs = this.orbs;
     if (this.beams.length) snap.beams = this.beams;
@@ -491,6 +526,7 @@ export class Game {
     this.phase = s.phase; this.phaseT = s.phaseT; this.cnt = s.cnt; this.timer = s.timer;
     this.banner = s.banner; this.label = s.label; this.msg = s.msg; this.matchWinner = s.matchWinner;
     this.victory = s.victory || null;
+    this.finisher = s.finisher || null;
     this.remoteFreeze = !!s.freeze;
     if (s.wins) this.wins = s.wins;
     s.fighters.forEach((sf, i) => {
@@ -543,6 +579,7 @@ export class Game {
       if (this.remoteFreeze) { this.updateCamera(dt); return; }
       this.banner = Math.max(0, this.banner - dt);
       if (this.victory) this.victory.t += dt;
+      if (this.finisher) this.finisher.t += dt;
       this.proj.forEach((p) => { p.x += p.vx * dt; if (p.vy) p.y += p.vy * dt; });
       this.orbs.forEach((o) => { o.x += (o.vx || 0) * dt; o.y += (o.vy || 0) * dt; });
       const blend = 1 - Math.exp(-18 * dt);
@@ -586,6 +623,8 @@ export class Game {
           this.endRound(hp0 > hp1 ? 0 : hp1 > hp0 ? 1 : -1, 'TIME UP');
         }
       }
+    } else if (this.phase === 'finisher') {
+      if (this.finisher) this.updateFinisher(dt);
     } else if (this.phase === 'ko') {
       if (this.victory) {
         this.victory.t += dt;
@@ -601,7 +640,7 @@ export class Game {
       }
     }
     const can = this.phase === 'fight' && (!this.dom || this.dom.st === 'linger') && !this.cutscene;
-    for (const f of this.fighters) this.step(f, this.nearestEnemy(f), dt, can);
+    if (this.phase !== 'finisher') for (const f of this.fighters) this.step(f, this.nearestEnemy(f), dt, can);
     if (this.dom) this.updateDomain(dt);
     if (this.cutscene) this.updateCutscene(dt);
     if (can) {
@@ -638,26 +677,40 @@ export class Game {
     this.orbs = this.orbs.filter((o) => this.updateOrb(o, dt, can));
     this.stepFx(dt);
     this.updateCamera(dt);
-    if (this.phase === 'fight') {
+    if (this.phase === 'fight' && !this.cutscene) {
       const dead = (f) => f.ko || f.hp <= 0 || f.y > H + 100;
       if (this.is2v2) {
         for (const f of this.fighters) {
           if (!f.ko && (f.hp <= 0 || f.y > H + 100)) {
-            f.ko = true; f.hp = 0; f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null;
-            this.sfx.ko(); this.texts.push({ txt: `${f.tag} K.O.!`, x: clamp(f.x, 120, this.worldW - 120), y: Math.min(f.y - 120, H - 80), t: 1.1, max: 1.1, color: '#ff5252', size: 34 });
+            const teamStillAlive = this.fighters.some((m) => m.team === f.team && m !== f && !dead(m));
+            if (teamStillAlive || f.y > H + 100) {
+              f.ko = true; f.hp = 0; f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null;
+              this.sfx.ko(); this.texts.push({ txt: `${f.tag} K.O.!`, x: clamp(f.x, 120, this.worldW - 120), y: Math.min(f.y - 120, H - 80), t: 1.1, max: 1.1, color: '#ff5252', size: 34 });
+            }
           }
         }
       }
       const d0 = this.fighters.filter((f) => f.team === 0).every(dead);
       const d1 = this.fighters.filter((f) => f.team === 1).every(dead);
       if (d0 && d1) this.endRound(-1, 'K.O.');
-      else if (d0) this.endRound(1, 'K.O.');
-      else if (d1) this.endRound(0, 'K.O.');
+      else if (d0 || d1) {
+        const winTeam = d0 ? 1 : 0;
+        const target = this.fighters.find((f) => f.team !== winTeam && f.hp <= 0 && f.y <= H + 80 && !f.ko)
+          || this.fighters.find((f) => f.team !== winTeam && f.hp <= 0 && f.y <= H + 80);
+        if (target) {
+          const att = (target.lastHitBy !== null && this.fighters[target.lastHitBy]?.team === winTeam && !this.fighters[target.lastHitBy]?.ko)
+            ? this.fighters[target.lastHitBy]
+            : (this.fighters.find((f) => f.team === winTeam && !f.ko) || this.fighters.find((f) => f.team === winTeam));
+          this.startFinisher(att, target, winTeam);
+        } else {
+          this.endRound(winTeam, 'K.O.');
+        }
+      }
     }
     if (this.netRole === 'host') this.syncNet();
   }
   endRound(w, label) {
-    this.phase = 'ko'; this.phaseT = w >= 0 ? 3.2 : 2.4; this.label = label; this.dom = null; this.cutscene = null;
+    this.phase = 'ko'; this.phaseT = w >= 0 ? 3.2 : 2.4; this.label = label; this.dom = null; this.cutscene = null; this.finisher = null;
     this.fighters.forEach((f) => { f.act = null; f.qte = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null; f.ragdollT = 0; f.stun = Math.max(f.stun, 0.5); });
     if (w >= 0) {
       this.wins[w]++;
@@ -991,6 +1044,7 @@ export class Game {
       this.enemiesOf(f).forEach((t) => {
         if (Math.abs(t.x - f.x) < sp.range && t.inv <= 0 && !t.ko && !t.ghost) {
           const sdmg = this.adaptHit(t, name, sp.dmg * qm);
+          t.lastHitBy = f.i;
           t.act = null; t.stun = Math.max(t.stun, sp.stunTime); t.vx = 0; t.hp = Math.max(0, t.hp - sdmg); t.flash = 0.12;
           this.ring(t.x, t.y - 80, 140, '#fff'); this.spark(t.x, t.y - 80, 16, '#fff', 260, 0.5, 5, 0);
           this.texts.push({ txt: "DON'T MOVE!", x: t.x, y: t.y - 170, t: 1, max: 1, color: '#fff', size: 38 });
@@ -1101,7 +1155,7 @@ export class Game {
       const k = cs.step++;
       const side = k % 2 ? -1 : 1;
       const bDmg = this.adaptHit(o, cs.name, dmgScale * 0.12);
-      o.hp = Math.max(0, o.hp - bDmg); o.flash = 0.12;
+      o.lastHitBy = f.i; o.hp = Math.max(0, o.hp - bDmg); o.flash = 0.12;
       if (sp.cut === 'bf3' || sp.cut === 'gamble') {
         this.pushAfter(f, sp.color);
         f.x = clamp(o.x - side * 72, 80, this.worldW - 80); f.y = o.y; f.face = side; f.act = { name: cs.name, t: 0.14 };
@@ -1138,7 +1192,7 @@ export class Game {
       cs.step = 4;
       const cx = (sp.cut === 'hollow' || sp.cut === 'uzumaki') ? (f.x + o.x) / 2 : o.x;
       const finDmg = this.adaptHit(o, cs.name, dmgScale * 0.64 * qm);
-      o.hp = Math.max(0, o.hp - finDmg); o.flash = 0.24; o.stun = Math.max(sp.stun, 0.9); o.ragdollT = 0.95;
+      o.lastHitBy = f.i; o.hp = Math.max(0, o.hp - finDmg); o.flash = 0.24; o.stun = Math.max(sp.stun, 0.9); o.ragdollT = 0.95;
       if (sp.cut === 'jacob') { o.ce = Math.max(0, o.ce - 40); o.amp = 0; }
       this.impulse(o, dir * 680, 440);
       for (let i = 0; i < 6; i++) this.zaps.push({ x: o.x + rnd(-40, 40), y: o.y - 80 + rnd(-40, 40), t: 0.4, color: i % 2 ? sp.color : '#fff' });
@@ -1224,6 +1278,176 @@ export class Game {
     }
     c.restore();
   }
+  /* ---------------- SIGNATURE FINISHER ATTACK (ท่าปิดฉากเมื่อเลือดหมด!) ---------------- */
+  startFinisher(f, o, winTeam) {
+    if (!f || !o) { this.endRound(winTeam, 'K.O.'); return; }
+    const key = f.mahoraga > 0 ? 'mahoraga' : f.chId;
+    const def = FINISHERS[key] || { jp: '終極奥義', title: 'ULTIMATE FINISHER', style: 'bf3', color: f.color };
+    this.dom = null; this.cutscene = null;
+    this.proj = []; this.orbs = []; this.beams = []; this.warns = [];
+    this.fighters.forEach((x) => {
+      if (x !== o && x !== f) { x.vx = 0; x.vy = 0; x.act = null; x.ledge = null; x.climbing = false; }
+    });
+    o.x = clamp(o.x, this.stageL + 60, this.stageR - 60);
+    if (o.y > GROUND) o.y = GROUND;
+    o.grounded = o.y >= GROUND - 2;
+    o.vx = 0; o.vy = 0; o.ko = false; o.ragdollT = 0; o.stun = 3.2; o.act = null; o.ledge = null; o.climbing = false; o.inv = 0;
+    const dir = o.x >= f.x ? 1 : -1;
+    if (Math.abs(o.x - f.x) > 300 || f.y > GROUND + 20) f.x = clamp(o.x - dir * 130, this.stageL + 40, this.stageR - 40);
+    f.y = o.y; f.grounded = o.grounded; f.face = o.x >= f.x ? 1 : -1;
+    f.act = { name: 'punch', t: 0 }; f.vx = 0; f.vy = 0; f.climbing = false; f.ledge = null; f.qte = null; f.inv = 4; f.ko = false;
+    this.phase = 'finisher';
+    this.finisher = { owner: f.i, target: o.i, team: winTeam, jp: def.jp, title: def.title, style: def.style, color: def.color, t: 0, dur: 2.05, step: 0 };
+    this.sfx.cutscene();
+    this.flash = { t: 0.22, max: 0.22, c: '#fff' };
+    this.shake = 18;
+    this.freeze = 0.08;
+    this.ring(o.x, o.y - 80, 240, def.color);
+    this.texts.push({ txt: 'FINISHER!', x: (f.x + o.x) / 2, y: Math.max(150, o.y - 185), t: 0.75, max: 0.75, color: '#ffd24a', size: 38 });
+  }
+  updateFinisher(dt) {
+    const fn = this.finisher; if (!fn) return;
+    const f = this.fighters[fn.owner], o = this.fighters[fn.target];
+    if (!f || !o) { const w = fn.team; this.finisher = null; this.endRound(w, 'K.O.'); return; }
+    fn.t += dt;
+    f.inv = 2; f.vx = 0; f.vy = 0;
+    const dir = o.x >= f.x ? 1 : -1;
+    const beats = [0.32, 0.62, 0.92];
+    if (fn.step < 3 && fn.t >= beats[fn.step]) {
+      const k = fn.step++;
+      const side = k % 2 ? -1 : 1;
+      o.flash = 0.14;
+      if (fn.style === 'bf3' || fn.style === 'gamble') {
+        this.pushAfter(f, fn.color);
+        f.x = clamp(o.x - side * 74, this.stageL + 30, this.stageR - 30);
+        f.y = o.y; f.face = side; f.act = { name: k === 1 ? 'kick' : 'punch', t: 0.14 };
+        this.impulse(o, side * 200, 150);
+        for (let i = 0; i < 4; i++) this.zaps.push({ x: o.x, y: o.y - 80, t: 0.26, color: i % 2 ? fn.color : '#111' });
+        this.ring(o.x, o.y - 80, 150 + k * 40, fn.color);
+        this.texts.push({ txt: fn.style === 'gamble' ? '7' : `黒閃 ${k + 1}!`, x: o.x + rnd(-45, 45), y: o.y - 155 - k * 14, t: 0.6, max: 0.6, color: fn.color, size: 36 });
+        if (fn.style === 'gamble' && k === 2) this.sfx.jackpot(); else this.sfx.bf();
+        this.shake = 18;
+      } else if (fn.style === 'bisect' || fn.style === 'blood' || fn.style === 'gavel') {
+        this.pushAfter(f, fn.color);
+        f.x = clamp(o.x + (k % 2 ? 115 : -115), this.stageL + 30, this.stageR - 30);
+        f.y = o.y; f.face = o.x >= f.x ? 1 : -1; f.act = { name: 'cleave', t: 0.16 };
+        this.slashes.push({ x: o.x, y: o.y - 75, a: [-0.45, 0.55, -0.08][k], len: 820, t: 0.34, max: 0.34, color: fn.color });
+        this.arcs.push({ x: o.x, y: o.y - 75, r: 170, face: f.face, t: 0.24, max: 0.24, color: fn.color });
+        this.sfx[fn.style === 'gavel' && k === 2 ? 'gavel' : 'slash']();
+        this.shake = 16;
+      } else if (fn.style === 'mahoraga') {
+        this.pushAfter(f, fn.color);
+        f.x = clamp(o.x - side * 95, this.stageL + 30, this.stageR - 30);
+        f.y = o.y; f.face = side; f.act = { name: 'cleave', t: 0.16 };
+        this.slashes.push({ x: o.x, y: o.y - 80, a: [-0.6, 0.6, 0][k], len: 860, t: 0.35, max: 0.35, color: fn.color });
+        this.ring(o.x, o.y - 80, 155 + k * 40, '#ffd54f');
+        this.sfx[k === 0 ? 'wheel' : 'slash']();
+        this.shake = 16;
+      } else if (fn.style === 'jacob' || fn.style === 'speech') {
+        f.act = { name: 'blue', t: 0.3 };
+        if (fn.style === 'jacob') this.pillars.push({ x: o.x + (k - 1) * 70, y: GROUND, t: 0.42, max: 0.42, color: '#ffe57f', w: 68 + k * 20 });
+        this.ring(o.x, o.y - 80, 140 + k * 55, fn.color);
+        this.spark(o.x, o.y - 80, 18, fn.color, 320, 0.42, 5, 0);
+        this.sfx[fn.style === 'jacob' ? 'thunder' : 'speech']();
+        this.shake = 15;
+      } else {
+        f.act = { name: 'blue', t: 0.3 };
+        this.ring((f.x + o.x) / 2, o.y - 85, 145 + k * 45, fn.color);
+        this.spark(o.x, o.y - 80, 20, fn.color, 340, 0.45, 5, 0);
+        this.sfx.charge();
+        this.shake = 12 + k * 4;
+      }
+    } else if (fn.step === 3 && fn.t >= 1.24) {
+      fn.step = 4;
+      f.act = { name: 'fuga', t: 0.25 }; f.face = dir;
+      const cx = (fn.style === 'hollow' || fn.style === 'uzumaki') ? (f.x + o.x) / 2 : o.x;
+      for (let i = 0; i < 6; i++) this.zaps.push({ x: o.x + rnd(-45, 45), y: o.y - 80 + rnd(-45, 45), t: 0.45, color: i % 2 ? fn.color : '#fff' });
+      if (fn.style === 'bisect' || fn.style === 'blood' || fn.style === 'mahoraga') {
+        for (let i = 0; i < 7; i++) this.slashes.push({ x: o.x + rnd(-90, 90), y: o.y - 80 + rnd(-60, 60), a: rnd(-1.4, 1.4), len: 1200, t: 0.5, max: 0.5, color: fn.color });
+      }
+      if (fn.style === 'jacob' || fn.style === 'meteor' || fn.style === 'gavel') {
+        this.pillars.push({ x: o.x, y: GROUND, t: 0.78, max: 0.78, color: fn.color, w: 165 });
+      }
+      this.ring(cx, o.y - 80, 480, fn.color);
+      this.ring(cx, o.y - 80, 280, '#fff');
+      this.spark(cx, o.y - 80, 60, fn.color, 640, 0.85, 8, 160);
+      this.flash = { t: 0.34, max: 0.34, c: fn.style === 'bf3' ? '#000' : '#fff' };
+      this.shake = 34; this.freeze = 0.14;
+      this.sfx.heavy(); this.sfx.boom();
+      this.texts.push({ txt: `${fn.title}!`, x: cx, y: Math.max(165, o.y - 205), t: 1.0, max: 1.0, color: fn.color, size: 42 });
+      o.ko = true; o.ragdollT = 1.4; o.vx = dir * 880; o.vy = -500; o.grounded = false;
+      this.impulse(o, dir * 820, 480);
+    }
+    if (fn.step < 4) {
+      o.vx = 0; o.vy = 0; o.stun = 1;
+    } else {
+      o.vy += 1900 * dt;
+      o.x = clamp(o.x + o.vx * dt, -200, this.worldW + 200);
+      o.y = Math.min(H + 260, o.y + o.vy * dt);
+      if (o.vy >= 0 && o.y >= GROUND && o.x > this.stageL && o.x < this.stageR) {
+        o.y = GROUND; o.vy = -Math.abs(o.vy) * 0.25; o.vx *= 0.65;
+      }
+    }
+    if (fn.t >= fn.dur) {
+      const w = fn.team;
+      this.finisher = null;
+      this.endRound(w, 'FINISHER!');
+    }
+  }
+  drawFinisherOverlay() {
+    const fn = this.finisher; if (!fn) return;
+    const c = this.c, f = this.fighters[fn.owner], o = this.fighters[fn.target], t = fn.t;
+    if (!f || !o) return;
+    c.save();
+    const cx = (fn.style === 'hollow' || fn.style === 'uzumaki') ? (f.x + o.x) / 2 : o.x, cy = o.y - 80;
+    c.globalAlpha = 0.55; c.strokeStyle = fn.color; c.lineWidth = 2.5;
+    for (let i = 0; i < 40; i++) {
+      const an = (i / 40) * Math.PI * 2 + t * 3.0, r0 = 120 + ((i * 31) % 75);
+      c.beginPath(); c.moveTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0);
+      c.lineTo(cx + Math.cos(an) * (r0 + 760), cy + Math.sin(an) * (r0 + 760)); c.stroke();
+    }
+    if (fn.style === 'hollow' && t < 1.32) {
+      const k = clamp((t - 0.15) / 0.72, 0, 1), dist = (1 - k) * 165, an = t * 10;
+      if (t < 0.96) {
+        this.drawOrb(cx + Math.cos(an) * dist, cy - 20 + Math.sin(an) * dist * 0.45, 44, '#40c4ff');
+        this.drawOrb(cx - Math.cos(an) * dist, cy - 20 - Math.sin(an) * dist * 0.45, 44, '#ff3d3d');
+      } else this.drawOrb(cx, cy - 20, 75 + (t - 0.96) * 340, '#d500f9');
+    } else if (fn.style === 'meteor' && t < 1.3) {
+      const my = -80 + clamp(t / 1.24, 0, 1) * (o.y + 10);
+      this.drawOrb(o.x, my, 128, '#ff6d00');
+      c.fillStyle = '#3e1a0d'; c.beginPath(); c.arc(o.x, my, 70, 0, 7); c.fill();
+    } else if (fn.style === 'uzumaki' && t < 1.3) {
+      c.strokeStyle = fn.color; c.lineWidth = 6;
+      for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(cx, cy - 30, 32 + i * 28, t * 9 + i, t * 9 + i + 4.6); c.stroke(); }
+    } else if (fn.style === 'mahoraga' && t < 1.3) {
+      c.save(); c.translate(f.x, f.y - 140); c.rotate(t * 5.2);
+      c.strokeStyle = '#ffd54f'; c.lineWidth = 4.5; c.beginPath(); c.arc(0, 0, 42, 0, 7); c.stroke();
+      for (let i = 0; i < 8; i++) { const a2 = (i * Math.PI) / 4; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(a2) * 56, Math.sin(a2) * 56); c.stroke(); }
+      c.restore();
+    } else if (fn.style === 'gavel' && t < 1.3) {
+      c.save(); c.translate(f.x, f.y - 80); c.rotate(f.face * (t < 0.9 ? -0.9 : 0.7));
+      c.shadowColor = '#ffd24a'; c.shadowBlur = 24; c.strokeStyle = '#fff'; c.lineWidth = 10;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(f.face * 150, -110); c.stroke();
+      c.strokeStyle = '#ffd24a'; c.lineWidth = 5; c.stroke();
+      c.restore();
+    }
+    c.restore();
+  }
+  drawFinisherBars() {
+    const fn = this.finisher; if (!fn) return;
+    const c = this.c, t = fn.t, bar = Math.min(1, t / 0.16) * 76;
+    const vx0 = this.vx0 ?? 0, vy0 = this.vy0 ?? 0, vw = this.vw ?? W, vy1 = this.vy1 ?? H;
+    c.save();
+    c.globalAlpha = 1; c.fillStyle = '#000';
+    c.fillRect(vx0, vy0, vw, Math.max(0, bar - vy0)); c.fillRect(vx0, H - bar, vw, Math.max(0, vy1 - (H - bar)));
+    c.fillStyle = fn.color; c.fillRect(vx0, bar - 3, vw, 3); c.fillRect(vx0, H - bar, vw, 3);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `44px ${FONT}`; c.lineWidth = 6; c.strokeStyle = '#000';
+    c.strokeText(fn.jp, W / 2, bar / 2); c.fillStyle = '#fff'; c.fillText(fn.jp, W / 2, bar / 2);
+    c.font = `24px ${FONT}`; c.fillStyle = fn.color;
+    c.fillText(`FINISHER · ${fn.title}`, W / 2, H - bar / 2);
+    c.restore();
+  }
   /* ---------------- DOMAIN SYSTEM (+ Linger Battleground) ---------------- */
   startDomain(f, o) {
     if (this.dom && this.dom.st !== 'linger') return;
@@ -1281,6 +1505,7 @@ export class Game {
         enemies.forEach((t) => {
           const blkMul = D.ability === 'slash' ? (t.blocking ? 0.85 : 1) : (t.blocking ? 0.5 : 1);
           const chip = this.adaptHit(t, `dom:${d.id}`, (D.dot || 1.4) * (d.mult || 1) * (f.pas.dmg || 1) * blkMul);
+          t.lastHitBy = f.i;
           t.hp = Math.max(0, t.hp - chip); t.flash = 0.06;
           this.spark(t.x, t.y - 80, 6, D.color, 200, 0.35, 4, 0);
           if (D.ability === 'drain') { t.ce = Math.max(0, t.ce - 6); f.hp = Math.min(100, f.hp + 0.9); }
@@ -1393,7 +1618,7 @@ export class Game {
         const perfect = best.e <= PERFECT; best.b.r = perfect ? 'perfect' : 'good'; d.streak++; d.best = Math.max(d.best, d.streak); if (perfect) d.perfect++;
         enemies.forEach((t) => {
           const beatDmg = this.adaptHit(t, `dom:${d.id}`, (perfect ? 1.4 : 0.7) * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1));
-          t.hp = Math.max(0, t.hp - beatDmg); t.flash = 0.08;
+          t.lastHitBy = f.i; t.hp = Math.max(0, t.hp - beatDmg); t.flash = 0.08;
           this.spark(t.x, t.y - 80, perfect ? 16 : 8, perfect ? '#ffd24a' : col, 320, 0.4, 5, 0); this.ring(t.x, t.y - 80, perfect ? 140 : 90, perfect ? '#ffd24a' : col);
         });
         this.judgeTxt(d, perfect ? 'PERFECT!' : 'GOOD', perfect ? '#ffd24a' : '#3dd6ff'); perfect ? this.sfx.perfect() : this.sfx.good();
@@ -1405,7 +1630,7 @@ export class Game {
   domainArt(d, f, o) {
     const D = DOMAINS[d.id], A = D.art, col = D.color, dir = o.x >= f.x ? 1 : -1, fx = A.fx;
     const artDmg = this.adaptHit(o, `dom:${d.id}`, A.dmg * 0.7 * (d.mult || 1) * (1 - d.resist) * (f.pas.dmg || 1));
-    o.hp = Math.max(0, o.hp - artDmg); o.flash = 0.1; this.impulse(o, dir * 160, 140);
+    o.lastHitBy = f.i; o.hp = Math.max(0, o.hp - artDmg); o.flash = 0.1; this.impulse(o, dir * 160, 140);
     this.sfx.art(); this.shake = Math.max(this.shake, 10);
     this.texts.push({ txt: A.name.toUpperCase() + '!', x: o.x, y: o.y - 175, t: 0.9, max: 0.9, color: col, size: 28 });
     if (fx === 'zap') for (let i = 0; i < 6; i++) this.later(i * 0.04, () => this.zaps.push({ x: o.x + rnd(-70, 70), y: o.y - rnd(20, 140), t: 0.25, color: i % 2 ? '#e1f5fe' : col }));
@@ -1427,7 +1652,7 @@ export class Game {
     enemies.forEach((o) => {
       const dir = o.x >= f.x ? 1 : -1;
       const tickDmg = this.adaptHit(o, `dom:${d.id}`, tk.dmg * (d.mult || 1) * rm * (1 - d.resist) * (f.pas.dmg || 1));
-      o.hp = Math.max(0, o.hp - tickDmg); o.flash = 0.1; o.inv = 0;
+      o.lastHitBy = f.i; o.hp = Math.max(0, o.hp - tickDmg); o.flash = 0.1; o.inv = 0;
       this.impulse(o, dir * (tk.final ? 520 : 80), tk.final ? 420 : 120);
       this.spark(o.x, o.y - 80, tk.final ? 40 : 12, col, tk.final ? 500 : 280, 0.5, 5);
       if (d.id === 'void' || d.id === 'moon' || d.id === 'soulhome' || d.id === 'cursedvoice') { this.flash = { t: 0.1, max: 0.1, c: col }; this.zaps.push({ x: o.x, y: o.y - 80, t: 0.2, color: col }); }
@@ -1472,6 +1697,7 @@ export class Game {
       return false;
     }
     if (def.blocking) {
+      def.lastHitBy = att.i;
       def.vx = dir * o.kb * 0.35; def.inv = 0.12; def.hp = Math.max(0, def.hp - o.dmg * 0.2); this.gain(att, def, o.dmg * 0.2);
       this.spark(hx - dir * 20, hy, 10, '#4fc3f7', 220, 0.3, 4); this.sfx.block(); this.shake = Math.max(this.shake, 3); this.impulse(def, dir * o.kb * 0.2, 0); return false;
     }
@@ -1490,6 +1716,7 @@ export class Game {
     const critChance = da && da.isOwner && da.ability === 'ratio73' ? 1 : (att.pas.crit || 0) + (da && da.isOwner && da.ability === 'nails' ? 0.3 : 0);
     if (critChance > 0 && Math.random() < critChance) { dmg *= 1.6; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
     dmg = this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg);
+    def.lastHitBy = att.i;
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
     def.stun = Math.max(def.stun, o.stun); def.act = null; def.inv = 0.2; def.flash = 0.12;
     if (o.ragdoll || o.kb >= 520) def.ragdollT = Math.max(def.ragdollT, o.ragdoll || 0.72);
@@ -1632,14 +1859,14 @@ export class Game {
     c.save();
     c.translate(ox, oy); c.scale(sc, sc);
     c.save(); c.translate(rnd(-s, s), rnd(-s, s));
-    if (this.is2v2 || this.victory) {
+    if (this.is2v2 || this.victory || this.finisher) {
       c.translate(W / 2, H / 2);
       c.scale(this.cam.z, this.cam.z);
       c.translate(-this.cam.x, -this.cam.y);
     }
     this.drawBg(); this.drawFloor();
     if (this.dom) this.drawDomain();
-    if (this.cutscene) { c.save(); c.fillStyle = 'rgba(4, 2, 12, 0.78)'; c.fillRect(-1400, -1400, this.worldW + 2800, H + 2800); c.restore(); }
+    if (this.cutscene || this.finisher) { c.save(); c.fillStyle = 'rgba(4, 2, 12, 0.78)'; c.fillRect(-1400, -1400, this.worldW + 2800, H + 2800); c.restore(); }
     this.drawPlatformsAndClimbs();
     this.warns.forEach((w) => {
       const k = 1 - w.t / w.max;
@@ -1692,9 +1919,11 @@ export class Game {
     this.fighters.forEach((f) => f.ledge && this.drawLedgeQTE(f));
     this.fighters.forEach((f) => f.qte && !f.qte.done && f.act && this.drawSkillQTE(f));
     if (this.cutscene) this.drawCutsceneOverlay();
+    if (this.finisher) this.drawFinisherOverlay();
     this.texts.forEach((t) => { c.globalAlpha = Math.min(1, t.t / t.max * 2); c.font = `${t.size}px ${FONT}`; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = '#000'; c.strokeText(t.txt, t.x, t.y); c.fillStyle = t.color; c.fillText(t.txt, t.x, t.y); });
     c.globalAlpha = 1; c.restore();
     if (this.cutscene) this.drawCutsceneBars();
+    if (this.finisher) this.drawFinisherBars();
     if (this.flash) { c.globalAlpha = (this.flash.t / this.flash.max) * 0.7; c.fillStyle = this.flash.c; c.fillRect(this.vx0, this.vy0, this.vw, this.vh); c.globalAlpha = 1; }
     this.drawHud(); if (this.dom) this.drawDomainIntro();
     this.drawClashHud();
