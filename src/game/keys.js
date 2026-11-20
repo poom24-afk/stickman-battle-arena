@@ -12,6 +12,7 @@ export const ACTIONS = [
   ['left', 'เดินซ้าย'], ['right', 'เดินขวา'], ['jump', 'กระโดด / ปีนขึ้น'], ['block', 'ป้องกัน / กดจังหวะ Parry / ต้านโดเมน'],
   ['punch', 'ต่อย / Domain Art'], ['kick', 'เตะ'], ['s1', 'สกิล 1'], ['s2', 'สกิล 2'], ['s3', 'สกิล 3'],
   ['dom', 'Domain / กดตามจังหวะ / กดรัวตอนปะทะ'],
+  ['fin', 'ท่าปิดฉาก (Finisher เมื่อศัตรู HP ≤ 30% / มึนงง)'],
 ];
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -64,4 +65,4 @@ export function keyLabel(code = '') {
   if (code.startsWith('Numpad')) { const r = code.slice(6); return 'NP' + (NUMPAD[r] || r); }
   return SPECIAL[code] || code.toUpperCase();
 }
-export const keyHints = (c) => c.map((p) => ['s1', 's2', 's3', 'dom', 'punch', 'block'].map((k) => keyLabel(p[k][0])));
+export const keyHints = (c) => c.map((p) => ['s1', 's2', 's3', 'dom', 'punch', 'block', 'fin'].map((k) => keyLabel(p[k][0])));

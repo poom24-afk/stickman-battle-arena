@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Game } from '../game/game.js';
 import { loadControls, controlProfileOf } from '../game/keys.js';
 
-const BTN = [['◀', 'left'], ['▶', 'right'], ['▲', 'jump'], ['🛡', 'block'], ['👊', 'punch'], ['🦶', 'kick'], ['①', 's1'], ['②', 's2'], ['③', 's3'], ['領', 'dom']];
+const BTN = [['◀', 'left'], ['▶', 'right'], ['▲', 'jump'], ['🛡', 'block'], ['👊', 'punch'], ['🦶', 'kick'], ['①', 's1'], ['②', 's2'], ['③', 's3'], ['領', 'dom'], ['☠', 'fin']];
 
 export default function Arena({ cfg, onEnd, onExit, online }) {
   const ref = useRef(null), game = useRef(null);

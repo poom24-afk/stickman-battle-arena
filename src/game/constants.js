@@ -191,13 +191,13 @@ export const ARENAS = [
 ];
 
 export const CONTROLS = [
-  { left: ['KeyA'], right: ['KeyD'], jump: ['KeyW'], block: ['KeyS'], punch: ['KeyF'], kick: ['KeyG'], s1: ['KeyH'], s2: ['KeyJ'], s3: ['KeyK'], dom: ['KeyL'] },
+  { left: ['KeyA'], right: ['KeyD'], jump: ['KeyW'], block: ['KeyS'], punch: ['KeyF'], kick: ['KeyG'], s1: ['KeyH'], s2: ['KeyJ'], s3: ['KeyK'], dom: ['KeyL'], fin: ['KeyR'] },
   { left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['ArrowUp'], block: ['ArrowDown'], punch: ['Numpad1', 'Digit1'], kick: ['Numpad2', 'Digit2'],
-    s1: ['Numpad3', 'Digit3'], s2: ['Numpad4', 'Digit4'], s3: ['Numpad5', 'Digit5'], dom: ['Numpad6', 'Digit6'] },
+    s1: ['Numpad3', 'Digit3'], s2: ['Numpad4', 'Digit4'], s3: ['Numpad5', 'Digit5'], dom: ['Numpad6', 'Digit6'], fin: ['Numpad0', 'Digit0'] },
   { left: ['KeyC'], right: ['KeyB'], jump: ['KeyV'], block: ['KeyN'], punch: ['KeyM'], kick: ['Comma'],
-    s1: ['Period'], s2: ['Slash'], s3: ['KeyQ'], dom: ['KeyE'] },
+    s1: ['Period'], s2: ['Slash'], s3: ['KeyQ'], dom: ['KeyE'], fin: ['KeyT'] },
   { left: ['BracketLeft'], right: ['BracketRight'], jump: ['Backslash'], block: ['Quote'], punch: ['KeyU'], kick: ['KeyI'],
-    s1: ['KeyO'], s2: ['Digit7'], s3: ['Digit8'], dom: ['Digit9'] },
+    s1: ['KeyO'], s2: ['Digit7'], s3: ['Digit8'], dom: ['Digit9'], fin: ['KeyY'] },
 ];
 
 /* สกินของแต่ละตัวละคร (เปลี่ยนสี/พร็อพบนตัว Stickman จริงในสนาม!) */

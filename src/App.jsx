@@ -13,7 +13,7 @@ const L = (c, k) => keyLabel(c[k][0]);
 const lines = (c) => [
   `${L(c, 'left')} / ${L(c, 'right')} เดิน · ${L(c, 'jump')} กระโดด/ปีน · ${L(c, 'block')} ป้องกัน/Parry`,
   `${L(c, 'punch')} ต่อย · ${L(c, 'kick')} เตะ`,
-  `${L(c, 's1')} / ${L(c, 's2')} / ${L(c, 's3')} สกิล 1-3 · ${L(c, 'dom')} Domain`,
+  `${L(c, 's1')} / ${L(c, 's2')} / ${L(c, 's3')} สกิล 1-3 · ${L(c, 'dom')} Domain · ${L(c, 'fin')} ปิดฉาก`,
 ];
 const Lines = ({ c }) => lines(c).map((t, i) => <span key={i}>{t}<br /></span>);
 
