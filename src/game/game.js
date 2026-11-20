@@ -239,6 +239,7 @@ export class Game {
         x: sx, y: GROUND, _tx: sx, _ty: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
         parryT: 0, parryCd: 0, dropT: 0, dropCool: 0, climbing: false, floorY: GROUND, ragdollT: 0, ledge: null, ledgeCd: 0,
         aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1, lastHitBy: null, dizzy: 0,
+        nails: 0, nailT: 0, landT: 0, skidT: 0,
         cd: [0, 0, 0], amp: 0, ampMul: 1, ampSpd: 1, ce: f.ce > 0 && this.round > 1 ? Math.min(60, f.ce) : 0, combo: 0, comboT: 0, flash: 0, anim: 0, grounded: true, ghost: false, ko: false, rag: 0, aura: 0, auraC: '#fff',
       });
       const T = this.targets(f, this.pose(f)); f.rig = {};
@@ -246,7 +247,7 @@ export class Game {
     });
     this.phase = 'countdown'; this.phaseT = 3; this.cnt = 4; this.timer = 99; this.msg = ''; this.dom = null; this.cutscene = null; this.finisher = null; this.victory = null;
     this.parts = []; this.proj = []; this.rings = []; this.beams = []; this.slashes = []; this.arcs = []; this.orbs = []; this.zaps = [];
-    this.pillars = []; this.texts = []; this.afters = []; this.warns = []; this.sched = []; this.flash = null;
+    this.pillars = []; this.decals = []; this.texts = []; this.afters = []; this.warns = []; this.sched = []; this.flash = null;
   }
   later(t, fn) { this.sched.push({ t, fn }); }
   effectiveSkill(f, idx) {
@@ -467,7 +468,7 @@ export class Game {
       }
     };
     collect(this.slashes, 'slashes'); collect(this.arcs, 'arcs'); collect(this.zaps, 'zaps');
-    collect(this.pillars, 'pillars'); collect(this.texts, 'texts'); collect(this.rings, 'rings');
+    collect(this.pillars, 'pillars'); collect(this.decals, 'decals'); collect(this.texts, 'texts'); collect(this.rings, 'rings');
     if (this.flash && !this.flash._s) { this.flash._s = true; this.netEvents.push(['flash', { t: this.flash.t, max: this.flash.max, c: this.flash.c }]); }
     if (this.shake > 2 && this.shake > this._lastShake + 1.5) this.netEvents.push(['shake', this.shake]);
     this._lastShake = this.shake;
@@ -504,7 +505,7 @@ export class Game {
         ragdollT: Math.round(f.ragdollT * 100) / 100, ko: f.ko, dizzy: Math.round((f.dizzy || 0) * 100) / 100, grounded: f.grounded, ghost: f.ghost,
         wins: f.wins, anim: Math.round(f.anim * 100) / 100, act: f.act, ledge: f.ledge, ai: f.ai, tag: f.tag,
         mahoraga: Math.round((f.mahoraga || 0) * 10) / 10, adaptSpin: Math.round((f.adaptSpin || 0) * 100) / 100,
-        qte: f.qte, adaptN: Object.keys(f.adapt || {}).length,
+        nails: f.nails || 0, qte: f.qte, adaptN: Object.keys(f.adapt || {}).length,
       })),
     };
     if (this.victory) snap.victory = this.victory;
@@ -524,6 +525,7 @@ export class Game {
       const [kind, a1, a2, a3, a4, a5, a6, a7, a8] = item;
       if (kind === 'sfx') rawSfx[a1]?.();
       else if (kind === 'spark') this.spark(a1, a2, a3, a4, a5, a6, a7, a8);
+      else if (kind === 'sparkDir') this.sparkDir(a1, a2, a3, a4, a5, a6, a7, a8);
       else if (kind === 'flash') this.flash = a1;
       else if (kind === 'shake') this.shake = Math.max(this.shake, a1);
       else if (kind === 'fx') this[a1]?.push(a2);
@@ -539,7 +541,7 @@ export class Game {
     if (roundChanged) {
       this.round = s.round;
       this.parts = []; this.proj = []; this.rings = []; this.beams = []; this.slashes = []; this.arcs = [];
-      this.orbs = []; this.zaps = []; this.pillars = []; this.texts = []; this.afters = []; this.warns = []; this.flash = null;
+      this.orbs = []; this.zaps = []; this.pillars = []; this.decals = []; this.texts = []; this.afters = []; this.warns = []; this.flash = null;
     }
     this.phase = s.phase; this.phaseT = s.phaseT; this.cnt = s.cnt; this.timer = s.timer;
     this.banner = s.banner; this.label = s.label; this.msg = s.msg; this.matchWinner = s.matchWinner;
@@ -559,7 +561,7 @@ export class Game {
         aura: sf.aura, auraC: sf.auraC, combo: sf.combo, comboT: sf.comboT, stun: sf.stun, inv: sf.inv, flash: sf.flash,
         blocking: sf.blocking, parryT: sf.parryT, climbing: sf.climbing, ragdollT: sf.ragdollT, ko: sf.ko, dizzy: sf.dizzy || 0,
         grounded: sf.grounded, ghost: sf.ghost, wins: sf.wins, anim: sf.anim, act: sf.act, ledge: sf.ledge, ai: sf.ai, tag: sf.tag,
-        mahoraga: sf.mahoraga || 0, adaptSpin: sf.adaptSpin || 0, qte: sf.qte || null, adaptN: sf.adaptN || 0,
+        mahoraga: sf.mahoraga || 0, adaptSpin: sf.adaptSpin || 0, nails: sf.nails || 0, qte: sf.qte || null, adaptN: sf.adaptN || 0,
       });
     });
     this.proj = s.proj || []; this.orbs = s.orbs || []; this.beams = s.beams || []; this.warns = s.warns || [];
@@ -572,12 +574,13 @@ export class Game {
     }
   }
   stepFx(dt) {
-    [this.beams, this.slashes, this.arcs, this.zaps, this.pillars, this.texts, this.rings, this.afters, this.warns].forEach((arr, k) => {
+    [this.beams, this.slashes, this.arcs, this.zaps, this.pillars, this.texts, this.rings, this.afters, this.warns, this.decals].forEach((arr, k) => {
       arr.forEach((x) => { x.t -= dt; if (k === 5) x.y -= 40 * dt; });
     });
     this.beams = this.beams.filter((x) => { if (x.t > 0 && this.netRole !== 'guest') { this.spark(x.x + x.d * rnd(0, this.worldW * 0.8), x.y + rnd(-x.th / 2, x.th / 2), 1, x.color, 120, 0.3, 5, 0); } return x.t > 0; });
     this.slashes = this.slashes.filter((x) => x.t > 0); this.arcs = this.arcs.filter((x) => x.t > 0);
     this.zaps = this.zaps.filter((x) => x.t > 0); this.pillars = this.pillars.filter((x) => x.t > 0);
+    this.decals = this.decals.filter((x) => x.t > 0);
     this.texts = this.texts.filter((x) => x.t > 0); this.rings = this.rings.filter((x) => x.t > 0);
     this.afters = this.afters.filter((x) => x.t > 0); this.warns = this.warns.filter((x) => x.t > 0);
     if (this.flash) { this.flash.t -= dt; if (this.flash.t <= 0) this.flash = null; }
@@ -598,7 +601,7 @@ export class Game {
       this.banner = Math.max(0, this.banner - dt);
       if (this.victory) this.victory.t += dt;
       if (this.finisher) this.finisher.t += dt;
-      this.proj.forEach((p) => { p.x += p.vx * dt; if (p.vy) p.y += p.vy * dt; });
+      this.proj.forEach((p) => { p.x += p.vx * dt; if (p.pvy) p.y += p.pvy * dt; });
       this.orbs.forEach((o) => { o.x += (o.vx || 0) * dt; o.y += (o.vy || 0) * dt; });
       const blend = 1 - Math.exp(-18 * dt);
       this.fighters.forEach((f) => {
@@ -677,18 +680,31 @@ export class Game {
     const due = []; this.sched = this.sched.filter((s) => { s.t -= dt; if (s.t <= 0) { due.push(s); return false; } return true; });
     due.forEach((s) => s.fn());
     this.proj = this.proj.filter((p) => {
-      p.x += p.vx * dt; p.life -= dt;
-      if (p.kind !== 'dog' && p.style !== 'chain') this.spark(p.x, p.y, 2, p.color, 70, 0.3, p.arrow ? 7 : 5, 0);
       const att = this.fighters[p.owner];
+      if (p.style === 'insect' && att) {
+        const aim = this.nearestEnemy(att);
+        if (aim && !aim.ko && !aim.ghost) p.pvy = clamp((aim.y - 75 - p.y) * 3.4, -260, 260);
+      }
+      p.x += p.vx * dt; if (p.pvy) p.y += p.pvy * dt; p.life -= dt;
+      if (p.kind !== 'dog' && p.style !== 'chain') this.spark(p.x, p.y, 2, p.color, 70, 0.3, p.arrow ? 7 : 5, 0);
       const t = att ? this.enemiesOf(att).find((e) => !e.ghost && !e.ko && Math.abs(p.x - e.x) < p.r + 18 && p.y > e.y - 130 - p.r && p.y < e.y + p.r) : null;
       if (can && t) {
-        const ok = this.hit(att, t, { dmg: p.dmg, kb: p.kb, stun: p.stun, vy: p.vy, big: !p.small, color: p.color, src: p.src || p.kind || 'proj' });
+        const ok = this.hit(att, t, { dmg: p.dmg, kb: p.kb, stun: p.stun, vy: p.vy, big: !p.small, color: p.color, drainCe: p.drainCe, cdAdd: p.cdAdd, src: p.src || p.kind || 'proj' });
         if (p.echo && ok === true) this.later(p.echo, () => {
           if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || t.ko) return;
-          t.inv = 0; this.hit(att, t, { dmg: p.dmg2, kb: p.kb2, stun: 0.5, vy: 300, big: true, color: p.color, src: p.src || 'resonance' });
-          this.ring(t.x, t.y - 80, 140, p.color); this.texts.push({ txt: 'RESONANCE!', x: t.x, y: t.y - 150, t: 0.7, max: 0.7, color: p.color, size: 38 });
+          t.inv = 0;
+          const stacks = t.nails || 0;
+          if (stacks > 0) t.nails = 0;
+          this.hit(att, t, { dmg: p.dmg2 + stacks * 1.1, kb: p.kb2, stun: 0.5, vy: 300, big: true, color: p.color, src: p.src || 'resonance' });
+          this.ring(t.x, t.y - 80, 140 + stacks * 24, p.color);
+          this.texts.push({ txt: stacks > 0 ? `RESONANCE ×${stacks}!` : 'RESONANCE!', x: t.x, y: t.y - 150, t: 0.7, max: 0.7, color: p.color, size: 38 });
         });
-        if (p.boom) { this.ring(p.x, p.y, p.boom * 1.7, p.color); this.ring(p.x, p.y, p.boom, '#fff'); this.spark(p.x, p.y, 36, p.color, 450, 0.7, 7, 300); this.shake = Math.max(this.shake, p.boom > 150 ? 20 : 12); this.sfx.boom(); }
+        if (p.boom) {
+          this.ring(p.x, p.y, p.boom * 1.7, p.color); this.ring(p.x, p.y, p.boom, '#fff');
+          this.spark(p.x, p.y, 36, p.color, 450, 0.7, 7, 300); this.shake = Math.max(this.shake, p.boom > 150 ? 20 : 12); this.sfx.boom();
+          const sy = this.surfaceBelow(p.x, p.y);
+          if (sy !== null && Math.abs(sy - p.y) < 160) this.addDecal(p.x, sy, 'scorch', p.color, Math.min(95, p.boom * 0.55));
+        }
         return false;
       }
       return p.life > 0 && p.x > -250 && p.x < this.worldW + 250;
@@ -821,6 +837,8 @@ export class Game {
     f.dropT = Math.max(0, f.dropT - dt); f.dropCool = Math.max(0, f.dropCool - dt);
     f.ledgeCd = Math.max(0, f.ledgeCd - dt);
     f.ragdollT = Math.max(0, f.ragdollT - dt);
+    f.landT = Math.max(0, (f.landT || 0) - dt);
+    if (f.nailT > 0) { f.nailT -= dt; if (f.nailT <= 0) f.nails = 0; }
     if (f.comboT <= 0) f.combo = 0;
     if (f.stun > 0) f.stun -= dt;
     if (can) { f.ce = Math.min(100, f.ce + dt * 1.5 * (f.pas.ce ?? 1)); if (f.pas.regen) f.hp = Math.min(100, f.hp + f.pas.regen * dt); }
@@ -937,11 +955,23 @@ export class Game {
         }
       }
       if (!f.grounded && onStage && py <= GROUND + 1 && f.y >= GROUND) {
-        if (f.ragdollT > 0 && vyB > 240) { f.y = GROUND; f.vy = -vyB * 0.34; f.vx *= 0.65; this.dust(f); this.sfx.punch(); }
+        if (f.ragdollT > 0 && vyB > 240) { f.y = GROUND; f.vy = -vyB * 0.34; f.vx *= 0.65; this.dust(f); this.sfx.land(); this.addDecal(f.x, GROUND, 'crack', '#90a4ae', 34); }
         else { f.y = GROUND; f.vy = 0; f.grounded = true; }
       }
     }
-    if (!wasG && f.grounded && vyB > 400) this.dust(f);
+    if (!wasG && f.grounded) {
+      f.landT = clamp(vyB / 1500, 0.08, 0.22);
+      if (vyB > 380) { this.dust(f); this.sfx.land(); }
+      if (vyB > 760) {
+        this.shake = Math.max(this.shake, 7);
+        this.addDecal(f.x, f.y, 'crack', '#b0bec5', 42);
+        this.spark(f.x, f.y, 10, '#cfd8dc', 240, 0.45, 5, 420);
+      }
+    }
+    if (f.grounded && !f.ko && Math.abs(f.vx) > (f.ragdollT > 0 ? 180 : 280) && this.time - (f.skidT || 0) > (f.ragdollT > 0 ? 0.06 : 0.13)) {
+      f.skidT = this.time;
+      this.spark(f.x - Math.sign(f.vx) * 14, f.y - 2, f.ragdollT > 0 ? 4 : 2, f.ragdollT > 0 ? '#ffd54f' : '#b0bec5', f.ragdollT > 0 ? 180 : 90, 0.28, 4, 220);
+    }
 
     /* ตรวจจับการคว้าขอบสนามตอนจะตกแมพ */
     if (can && !f.grounded && !f.climbing && !f.ko && !f.ledge && f.ledgeCd <= 0 && !f.act && f.vy > 0 && f.y >= GROUND + 4 && f.y <= GROUND + 115) {
@@ -959,7 +989,15 @@ export class Game {
     const sp = spec(name); f.act = { name, t: 0, hit: false, fired: false, arc: false }; f.climbing = false; f.parryT = 0;
     f.qteMul = 1;
     f.qte = sp.qte ? { t: 0, start: sp.qte.t0, end: sp.qte.t1, dur: sp.qte.dur, mul: sp.qte.mul || 1.4, done: false, ok: false } : null;
-    if (sp.lunge) f.vx = f.face * sp.lunge;
+    if (sp.blinkBehind && o && !o.ko && !o.ghost) {
+      this.pushAfter(f, sp.color || f.color);
+      this.ring(f.x, f.y - 75, 90, sp.color || f.color);
+      f.x = clamp(o.x - o.face * 56, this.stageL + 30, this.stageR - 30);
+      f.y = o.y; f.grounded = o.grounded; f.face = o.x >= f.x ? 1 : -1;
+      this.sfx.warp(); this.ring(f.x, f.y - 75, 110, sp.color || f.color);
+      this.texts.push({ txt: 'CLAP FEINT!', x: f.x, y: f.y - 160, t: 0.65, max: 0.65, color: sp.color || '#ff8a3d', size: 28 });
+    }
+    if (sp.lunge) { f.vx = f.face * sp.lunge; if (sp.lunge >= 500) this.sfx.whoosh(); }
     if (name === 'kick') this.sfx.kick(); else if (sp.kind === 'melee' || sp.kind === 'cutmelee') this.sfx.punch(); else this.sfx.charge();
   }
   actUpdate(f, o, dt) {
@@ -981,14 +1019,14 @@ export class Game {
         const tgt = can ? this.enemiesOf(f).find((e) => !e.ko && !e.ghost && x2 > e.x - 20 && x1 < e.x + 20 && y2 > e.y - 130 && y1 < e.y) : null;
         if (tgt) {
           a.hit = true;
-          if (sp.fx === 'slash' || sp.fx === 'ratio' || sp.fx === 'nullify') {
+          if (sp.fx === 'slash' || sp.fx === 'ratio' || sp.fx === 'nullify' || sp.fx === 'soulsplit' || sp.fx === 'collapse' || sp.fx === 'gavel') {
             this.arcs.push({ x: f.x + f.face * 32, y: f.y - 72, r: sp.reach * 0.85, face: f.face, t: 0.26, max: 0.26, color: col });
           }
           if (sp.kind === 'cutmelee' && tgt.inv <= 0 && !tgt.ko && !tgt.blocking && tgt.parryT <= 0) {
             this.startCutscene(f, tgt, sp, a.name);
             return;
           }
-          const ok = this.hit(f, tgt, { dmg: sp.dmg * qm, kb: sp.kb * (qm > 1 ? 1.15 : 1), stun: sp.stun, vy: a.name === 'kick' ? 330 : undefined, big: sp.dmg >= 9 || qm > 1, color: qm > 1 ? '#ffd24a' : col, fx: sp.fx, ragdoll: sp.ragdoll, basic: a.name === 'punch' || a.name === 'kick', src: a.name });
+          const ok = this.hit(f, tgt, { dmg: sp.dmg * qm, kb: sp.kb * (qm > 1 ? 1.15 : 1), stun: sp.stun, vy: a.name === 'kick' ? 330 : undefined, big: sp.dmg >= 9 || qm > 1, color: qm > 1 ? '#ffd24a' : col, fx: sp.fx, pierceBlock: sp.pierceBlock, ragdoll: sp.ragdoll, basic: a.name === 'punch' || a.name === 'kick', src: a.name });
           if (sp.delay && ok === true) this.later(sp.delay, () => {
             if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || tgt.ko) return;
             tgt.inv = 0; this.hit(f, tgt, { dmg: sp.dmg2 * qm, kb: sp.kb2, stun: 0.65, vy: 430, big: true, ragdoll: 0.85, color: col, src: a.name });
@@ -1022,6 +1060,14 @@ export class Game {
   fire(f, o, name, sp) {
     const col = sp.color, x0 = f.x + f.face * 35, y0 = f.y - 80, qm = f.qteMul || 1;
     if (sp.kind === 'proj') {
+      if (sp.heal) {
+        f.hp = Math.min(100, f.hp + sp.heal);
+        this.texts.push({ txt: `+${sp.heal} HP`, x: f.x, y: f.y - 165, t: 0.75, max: 0.75, color: col, size: 28 });
+      }
+      if (sp.style === 'red') {
+        this.arcs.push({ x: f.x + f.face * 24, y: f.y - 80, r: 58, face: f.face, t: 0.22, max: 0.22, color: '#ff3d3d' });
+        this.sfx.blast();
+      }
       for (let i = 0; i < (sp.n || 1); i++) {
         const shot = () => {
           if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene || f.stun > 0 || f.ko) return;
@@ -1043,8 +1089,14 @@ export class Game {
       });
     } else if (sp.kind === 'slashes') {
       this.sfx.slash(); const x1 = f.x + f.face * 40, x2 = f.x + f.face * sp.range, xv = f.x + f.face * Math.min(sp.range, 900);
+      const isRika = sp.style === 'rikaclaw';
+      if (isRika) {
+        this.ring(f.x + f.face * 65, f.y - 80, 140, col);
+        this.arcs.push({ x: f.x + f.face * 44, y: f.y - 75, r: 135, face: f.face, t: 0.3, max: 0.3, color: col });
+        if (sp.heal) { f.hp = Math.min(100, f.hp + sp.heal); this.texts.push({ txt: `+${sp.heal} HP`, x: f.x, y: f.y - 165, t: 0.75, max: 0.75, color: col, size: 28 }); }
+      }
       for (let i = 0; i < sp.n; i++) this.later(i * 0.04, () => {
-        this.slashes.push({ x: x1 + (xv - x1) * Math.random(), y: f.y - rnd(10, 140), a: rnd(-1.1, 1.1), len: rnd(160, 300), t: 0.3, max: 0.3, color: name === 'worldslash' ? '#ff5252' : '#80deea' });
+        this.slashes.push({ x: x1 + (xv - x1) * Math.random(), y: f.y - rnd(10, 140), a: isRika ? (-0.7 + i * 0.26) * f.face : rnd(-1.1, 1.1), len: isRika ? rnd(210, 340) : rnd(160, 300), t: 0.3, max: 0.3, color: name === 'worldslash' ? '#ff5252' : (isRika ? '#ff80ab' : '#80deea') });
         this.sfx.slash();
       });
       this.enemiesOf(f).forEach((t) => {
@@ -1071,6 +1123,7 @@ export class Game {
       this.texts.push({ txt: 'CLAP!', x: f.x, y: f.y - 150, t: 0.6, max: 0.6, color: col, size: 36 });
     } else if (sp.kind === 'speech') {
       this.sfx.speech(); this.ring(f.x, f.y - 80, 160, col); this.ring(f.x, f.y - 80, 320, col);
+      this.texts.push({ txt: '「動くな」', x: f.x, y: f.y - 165, t: 0.75, max: 0.75, color: col, size: 34 });
       this.enemiesOf(f).forEach((t) => {
         if (Math.abs(t.x - f.x) < sp.range && t.inv <= 0 && !t.ko && !t.ghost) {
           const sdmg = this.adaptHit(t, name, sp.dmg * qm);
@@ -1098,14 +1151,34 @@ export class Game {
         }
       });
     } else if (sp.kind === 'buff') {
-      this.sfx.buff(); f.inv = Math.max(f.inv, sp.time); f.aura = sp.time; f.auraC = col; this.ring(f.x, f.y - 80, 150, col);
-      this.texts.push({ txt: 'INFINITY', x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 38 });
+      f.inv = Math.max(f.inv, sp.time); f.aura = sp.time; f.auraC = col;
+      if (sp.style === 'waterwall') {
+        this.sfx.splash();
+        if (sp.heal) f.hp = Math.min(100, f.hp + sp.heal);
+        this.ring(f.x, f.y - 75, sp.pushRadius || 175, col);
+        this.ring(f.x, f.y - 75, 110, '#fff');
+        this.spark(f.x, f.y - 75, 28, col, 360, 0.6, 5, 260);
+        this.texts.push({ txt: `ABYSSAL BARRIER! +${sp.heal || 0}`, x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 32 });
+        this.enemiesOf(f).forEach((t) => {
+          if (!t.ko && !t.ghost && Math.hypot(t.x - f.x, t.y - f.y) < (sp.pushRadius || 175)) {
+            this.hit(f, t, { dmg: (sp.dmg || 7) * qm, kb: sp.kb || 740, stun: 0.5, vy: 260, big: true, color: col, src: name });
+          }
+        });
+      } else {
+        this.sfx.buff(); this.ring(f.x, f.y - 80, 150, col);
+        this.texts.push({ txt: 'INFINITY', x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 38 });
+      }
     } else if (sp.kind === 'heal') {
       this.sfx.heal(); f.hp = Math.min(100, f.hp + sp.heal); this.spark(f.x, f.y - 60, 30, col, 200, 0.8, 6, -300); this.ring(f.x, f.y - 80, 120, col);
       this.texts.push({ txt: `+${sp.heal} HP`, x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 36 });
     } else if (sp.kind === 'amp') {
       this.sfx.buff(); f.amp = sp.time; f.ampMul = sp.mul; f.ampSpd = sp.spd || 1; if (sp.inv) f.inv = Math.max(f.inv, sp.inv);
       f.aura = sp.time; f.auraC = col; this.ring(f.x, f.y - 80, 150, col); this.spark(f.x, f.y - 60, 22, col, 260, 0.7, 5, -200);
+      if (sp.style === 'train') {
+        this.sfx.clang();
+        this.pillars.push({ x: f.x - 52, y: f.y, t: 0.55, max: 0.55, color: '#7dff6b', w: 18 });
+        this.pillars.push({ x: f.x + 52, y: f.y, t: 0.55, max: 0.55, color: '#ff4081', w: 18 });
+      }
       this.texts.push({ txt: sp.short, x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 34 });
     } else if (sp.kind === 'jackpot') {
       this.sfx.jackpot(); this.ring(f.x, f.y - 80, 140, col);
@@ -1118,8 +1191,10 @@ export class Game {
       this.sfx.charge(); this.warns.push({ x: tx, y: ty, r: sp.radius, t: sp.delay, max: sp.delay, color: col, name });
       this.later(sp.delay, () => {
         if (this.phase !== 'fight' || (this.dom && this.dom.st !== 'linger') || this.cutscene) return;
-        this.pillars.push({ x: tx, y: ty, t: 0.5, max: 0.5, color: col, w: sp.radius * 0.7 }); this.sfx.thunder(); this.shake = Math.max(this.shake, 16);
+        this.pillars.push({ x: tx, y: ty, t: 0.5, max: 0.5, color: col, w: sp.radius * 0.7 });
+        this.sfx[sp.style === 'maw' ? 'howl' : 'thunder'](); this.shake = Math.max(this.shake, 16);
         this.spark(tx, ty, 26, col, 420, 0.6, 6, 400); this.ring(tx, ty, sp.radius * 2.2, '#fff'); this.zaps.push({ x: tx, y: ty - 150, t: 0.3, color: col });
+        if (name === 'eruption' || name === 'meteor' || sp.style === 'maw') this.addDecal(tx, ty, name === 'eruption' || name === 'meteor' ? 'scorch' : 'crack', col, sp.radius * 0.72);
         this.enemiesOf(f).forEach((t) => {
           if (!t.ko && !t.ghost && Math.abs(t.x - tx) < sp.radius && Math.abs(t.y - ty) < 160) this.hit(f, t, { dmg: sp.dmg * qm, kb: sp.kb, stun: sp.stun, vy: sp.vy, big: true, color: col, src: name });
         });
@@ -1127,14 +1202,17 @@ export class Game {
     }
   }
   shoot(f, sp, over) {
-    this.proj.push({ x: f.x + f.face * 45, y: f.y - 80, sx: f.x + f.face * 20, sy: f.y - 80, vx: f.face * sp.speed, owner: f.i, color: sp.color, style: sp.style, life: sp.life, r: sp.r, dmg: sp.dmg, kb: sp.kb, stun: sp.stun, boom: sp.boom, vy: sp.vy, arrow: sp.arrow, face: f.face, echo: sp.echo, dmg2: sp.dmg2, kb2: sp.kb2, small: sp.small, ...over });
+    this.proj.push({ x: f.x + f.face * 45, y: f.y - 80, sx: f.x + f.face * 20, sy: f.y - 80, vx: f.face * sp.speed, owner: f.i, color: sp.color, style: sp.style, life: sp.life, r: sp.r, dmg: sp.dmg, kb: sp.kb, stun: sp.stun, boom: sp.boom, vy: sp.vy, drainCe: sp.drainCe, cdAdd: sp.cdAdd, arrow: sp.arrow, face: f.face, echo: sp.echo, dmg2: sp.dmg2, kb2: sp.kb2, small: sp.small, ...over });
   }
   updateOrb(o, dt, can) {
     o.t += dt; const att = this.fighters[o.owner];
     if (!can) return o.t < o.hold + 0.1;
     const enemies = att ? this.enemiesOf(att) : [];
     enemies.forEach((t) => {
-      if (!t.ghost && !t.ko) { const dx = o.x - t.x; t.x += Math.sign(dx) * Math.min(Math.abs(dx), 480 * dt); if (t.grounded) t.vx = 0; }
+      if (!t.ghost && !t.ko) {
+        const dx = o.x - t.x; t.x += Math.sign(dx) * Math.min(Math.abs(dx), 480 * dt);
+        if (t.grounded && Math.abs(dx) < 160) { t.vx = 0; t.vy = -120; t.grounded = false; }
+      }
     });
     this.spark(o.x + rnd(-60, 60), o.y + rnd(-60, 60), 1, o.color, 40, 0.3, 4, 0);
     o.tick -= dt;
@@ -1987,12 +2065,20 @@ export class Game {
       this.sfx.parry(); this.shake = Math.max(this.shake, 18); this.freeze = 0.14; this.flash = { t: 0.12, max: 0.12, c: '#ffd24a' };
       return false;
     }
-    if (def.blocking) {
+    if (def.blocking && !o.pierceBlock) {
       def.lastHitBy = att.i;
       def.vx = dir * o.kb * 0.35; def.inv = 0.12; def.hp = Math.max(0, def.hp - o.dmg * 0.2); this.gain(att, def, o.dmg * 0.2);
-      this.spark(hx - dir * 20, hy, 10, '#4fc3f7', 220, 0.3, 4); this.sfx.block(); this.shake = Math.max(this.shake, 3); this.impulse(def, dir * o.kb * 0.2, 0); return false;
+      this.sparkDir(hx - dir * 20, hy, -dir, 10, '#4fc3f7', 260, 0.3, 4);
+      const bladeHit = o.fx === 'slash' || o.fx === 'ratio' || o.fx === 'nullify' || o.fx === 'collapse' || o.fx === 'gavel';
+      (bladeHit ? this.sfx.clang : this.sfx.block)();
+      this.shake = Math.max(this.shake, 3); this.impulse(def, dir * o.kb * 0.2, 0); return false;
     }
     o = { ...o };
+    if (def.blocking && o.pierceBlock) {
+      o.dmg *= 0.8;
+      this.texts.push({ txt: 'GUARD PIERCE!', x: hx, y: hy - 145, t: 0.7, max: 0.7, color: o.color || '#a7ffeb', size: 28 });
+      this.sfx.slash();
+    }
     /* คอมโบหมัดที่ 3 ซัดกระเด็นล้มเป็น Ragdoll! */
     const finisher = o.basic && att.combo >= 2;
     if (finisher) { o.dmg *= 1.35; o.kb = Math.max(o.kb, 620); o.vy = 360; o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.85; o.big = true; }
@@ -2006,6 +2092,15 @@ export class Game {
     if (o.basic && att.pas.basic) dmg *= att.pas.basic;
     const critChance = da && da.isOwner && da.ability === 'ratio73' ? 1 : (att.pas.crit || 0) + (da && da.isOwner && da.ability === 'nails' ? 0.3 : 0);
     if (critChance > 0 && Math.random() < critChance) { dmg *= 1.4; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
+    if (o.src === 'hairpin' || o.src === 'nailhammer') {
+      def.nails = Math.min(5, (def.nails || 0) + (o.src === 'nailhammer' ? 2 : 1));
+      def.nailT = 6.0;
+      if (o.src === 'nailhammer' && def.nails >= 3) {
+        const stacks = def.nails; def.nails = 0; dmg += stacks * 1.1;
+        this.ring(hx, hy, 125, '#ff6bd6');
+        this.texts.push({ txt: `NAIL BURST ×${stacks}!`, x: hx, y: hy - 145, t: 0.75, max: 0.75, color: '#ff6bd6', size: 30 });
+      }
+    }
     dmg = Math.min(34, this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg));
     def.lastHitBy = att.i;
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
@@ -2013,7 +2108,10 @@ export class Game {
     if (o.ragdoll || o.kb >= 520) def.ragdollT = Math.max(def.ragdollT, o.ragdoll || 0.72);
     att.combo++; att.comboT = 1.3; this.gain(att, def, dmg);
     this.impulse(def, dir * o.kb * (def.ragdollT > 0 ? 1.4 : 1), o.vy === undefined ? 260 : o.vy);
-    this.spark(hx, hy, o.big ? 28 : 14, o.color || '#fff', o.big ? 450 : 280, 0.5, 5);
+    this.sparkDir(hx, hy, dir, o.big ? 22 : 12, o.color || '#fff', o.big ? 480 : 300, 0.48, 5, 520);
+    if (o.big && def.y > GROUND - 45) {
+      this.spark(def.x, GROUND, 8, '#b0bec5', 220, 0.42, 5, 360);
+    }
     this.ring(hx, hy, o.big ? 115 : 65, o.big ? (o.color || '#fff') : '#fff');
     (o.big ? (o.kb >= 600 ? this.sfx.heavy : this.sfx.hit) : this.sfx.punch)();
     this.shake = Math.max(this.shake, o.big ? 16 : 8); this.freeze = o.big ? 0.10 : 0.045;
@@ -2023,7 +2121,24 @@ export class Game {
       for (let i = 0; i < 4; i++) this.zaps.push({ x: hx, y: hy, t: 0.35, color: i % 2 ? '#ff1744' : '#111' });
       this.texts.push({ txt: 'BLACK FLASH!', x: hx, y: hy - 90, t: 0.9, max: 0.9, color: '#ff1744', size: 46 });
     } else if (o.fx === 'slash') this.slashes.push({ x: hx, y: hy, a: rnd(-0.7, -0.3), len: 260, t: 0.25, max: 0.25, color: '#fff' });
-    else if (o.fx === 'ratio') {
+    else if (o.fx === 'soulsplit') {
+      this.sfx.slash(); this.slashes.push({ x: hx, y: hy, a: -0.55 * dir, len: 310, t: 0.28, max: 0.28, color: '#a7ffeb' });
+      this.slashes.push({ x: hx, y: hy - 12, a: 0.45 * dir, len: 260, t: 0.26, max: 0.26, color: '#fff' });
+      this.texts.push({ txt: 'SOUL CUT!', x: hx, y: hy - 105, t: 0.75, max: 0.75, color: '#a7ffeb', size: 32 });
+    } else if (o.fx === 'collapse') {
+      const sy = def.floorY ?? GROUND;
+      this.sfx.slam(); this.addDecal(def.x, sy, 'crack', '#ffd54f', 76);
+      this.spark(def.x, sy, 18, '#90a4ae', 380, 0.55, 7, 680);
+      this.slashes.push({ x: hx, y: hy, a: 0.25 * dir, len: 290, t: 0.28, max: 0.28, color: '#ffd54f' });
+      this.texts.push({ txt: '7:3 COLLAPSE!', x: hx, y: hy - 105, t: 0.8, max: 0.8, color: '#ffd54f', size: 36 });
+    } else if (o.fx === 'gavel') {
+      const sy = def.floorY ?? GROUND;
+      this.sfx.gavel(); this.addDecal(def.x, sy, 'crack', '#ffd24a', 85);
+      this.ring(def.x, sy, 185, '#ffd24a');
+      this.texts.push({ txt: 'VERDICT SLAM!', x: hx, y: hy - 105, t: 0.8, max: 0.8, color: '#ffd24a', size: 34 });
+    } else if (o.fx === 'speed') {
+      this.sfx.whoosh(); this.slashes.push({ x: hx, y: hy, a: 0, len: 340, t: 0.22, max: 0.22, color: o.color || '#7dff6b' });
+    } else if (o.fx === 'ratio') {
       this.slashes.push({ x: hx, y: hy, a: -0.15, len: 300, t: 0.3, max: 0.3, color: '#ffd54f' }); this.shake = Math.max(this.shake, 16); this.freeze = 0.1;
       this.texts.push({ txt: '7 : 3', x: hx, y: hy - 90, t: 0.8, max: 0.8, color: '#ffd54f', size: 46 });
     } else if (o.fx === 'drain') {
@@ -2035,14 +2150,33 @@ export class Game {
     } else if (o.fx === 'soul') {
       for (let i = 0; i < 2; i++) this.ring(hx, hy, 90 + i * 45, '#9ccc65');
     }
+    if (o.drainCe || o.cdAdd) {
+      if (o.drainCe) def.ce = Math.max(0, def.ce - o.drainCe);
+      if (o.cdAdd) def.cd = def.cd.map((v) => v + o.cdAdd);
+      this.sfx.seal();
+      this.texts.push({ txt: 'CONFISCATED!', x: hx, y: hy - 125, t: 0.85, max: 0.85, color: '#ffe082', size: 28 });
+    }
     return true;
   }
   gain(att, def, d) { att.ce = Math.min(100, att.ce + d * (att.pas.ce ?? 1)); def.ce = Math.min(100, def.ce + d * 1.4 * (def.pas.ce ?? 1)); }
   impulse(f, vx, vy) { NAMES.forEach((n) => { const p = f.rig[n], r = rnd(0.5, 1.35); p.ox = p.x - (vx / 55) * r; p.oy = p.y + (vy / 55) * r * 0.7; }); }
   pushAfter(f, color) { this.afters.push({ rig: Object.fromEntries(NAMES.map((n) => [n, { x: f.rig[n].x, y: f.rig[n].y }])), face: f.face, color, gear: f.gear, t: 0.3, max: 0.3 }); if (this.netRole === 'host') this.netEvents.push(['after', f.i, color]); }
+  addDecal(x, y, kind, color, r = 55) {
+    this.decals.push({ x, y, kind, color, r, t: 6.5, max: 6.5 });
+    if (this.decals.length > 28) this.decals.splice(0, this.decals.length - 28);
+  }
   spark(x, y, n, color, spd, life, size, g = 600) {
     if (this.netRole === 'host') this.netEvents.push(['spark', x, y, n, color, spd, life, size, g]);
     for (let i = 0; i < n; i++) { const an = rnd(0, Math.PI * 2), s = rnd(0.2, 1) * spd; this.parts.push({ x, y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, life: rnd(0.5, 1) * life, max: life, color, size: rnd(0.5, 1) * size, g }); }
+    if (this.parts.length > 220) this.parts.splice(0, this.parts.length - 220);
+  }
+  sparkDir(x, y, dir, n, color, spd, life, size, g = 520) {
+    if (this.netRole === 'host') this.netEvents.push(['sparkDir', x, y, dir, n, color, spd, life, size, g]);
+    const base = dir > 0 ? -0.15 : Math.PI + 0.15;
+    for (let i = 0; i < n; i++) {
+      const an = base + rnd(-0.75, 0.75), s = rnd(0.35, 1.05) * spd;
+      this.parts.push({ x, y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 45, life: rnd(0.5, 1) * life, max: life, color, size: rnd(0.55, 1.05) * size, g });
+    }
     if (this.parts.length > 220) this.parts.splice(0, this.parts.length - 220);
   }
   ring(x, y, r, color) { this.rings.push({ x, y, r, t: 0.35, max: 0.35, color }); }
@@ -2088,6 +2222,10 @@ export class Game {
           else { P = { lean: -4, crouch: 0, fF: [24, -6], fB: [-12, 0], hF: [14, 12], hB: [-12, 16] }; }
           break;
         case 'fire': P.lean = 15; P.crouch = 4; P.hF = [32 + e * 62, -8]; P.hB = [-16, -10]; P.fF = [28, 0]; P.fB = [-26, 0]; break;
+        case 'slam':
+          if (k < 0.34) { P = { lean: -8, crouch: -4, hF: [18, -46], hB: [8, -42], fF: [18, 0], fB: [-18, 0] }; }
+          else { P = { lean: 22, crouch: 18, hF: [52, 34], hB: [22, 26], fF: [28, 0], fB: [-26, 0] }; }
+          break;
         case 'clap': P.hF = [26, -18]; P.hB = [24, -16]; P.crouch = 4; break;
         default: P.lean = -6; P.hF = [44, 2]; P.hB = [38, 8]; P.fF = [26, 0]; P.fB = [-26, 0];
       }
@@ -2098,7 +2236,14 @@ export class Game {
     else if (f.blocking) P = { lean: 0, crouch: 10, hF: [22, -16], hB: [16, -6], fF: [16, 0], fB: [-10, 0] };
     else if (!f.grounded) P = f.vy < 0 ? { lean: 4, crouch: 6, hF: [26, -16], hB: [-20, -14], fF: [22, -20], fB: [-14, -10] } : { lean: -2, crouch: 2, hF: [28, -4], hB: [-24, -8], fF: [18, -10], fB: [-12, -2] };
     else if (Math.abs(f.vx) > 20) { const s = Math.sin(f.anim * 13); P = { lean: 11, crouch: 2, fF: [s * 28, -Math.max(0, -s) * 14], fB: [-s * 28, -Math.max(0, s) * 14], hF: [-s * 22, 22], hB: [s * 22, 22] }; }
-    else { const b = Math.sin(t * 5.5 + f.i) * 2.5; P.crouch = 2 + Math.abs(b) * 0.4; P.hF = [26, 12 + b]; P.hB = [-4, 20 - b * 0.5]; }
+    else {
+      const low = f.hp <= 30, b = Math.sin(t * (low ? 9 : 5.5) + f.i) * (low ? 4 : 2.5);
+      P.lean = low ? 5 : 0; P.crouch = (low ? 6 : 2) + Math.abs(b) * 0.4;
+      P.hF = [26, (low ? 18 : 12) + b]; P.hB = [-4, (low ? 24 : 20) - b * 0.5];
+    }
+    if ((f.landT || 0) > 0 && f.grounded && !a) {
+      P.crouch += Math.sin((f.landT / 0.22) * Math.PI) * 14;
+    }
     return P;
   }
   targets(f, P) {
@@ -2163,6 +2308,26 @@ export class Game {
     if (this.dom) this.drawDomain();
     if (this.cutscene || this.finisher) { c.save(); c.fillStyle = 'rgba(4, 2, 12, 0.78)'; c.fillRect(-1400, -1400, this.worldW + 2800, H + 2800); c.restore(); }
     this.drawPlatformsAndClimbs();
+    this.decals.forEach((dc) => {
+      const fade = clamp(dc.t / dc.max, 0, 1);
+      c.save(); c.globalAlpha = fade * 0.72;
+      if (dc.kind === 'scorch') {
+        const g = c.createRadialGradient(dc.x, dc.y + 3, 4, dc.x, dc.y + 3, dc.r);
+        g.addColorStop(0, dc.color + 'aa'); g.addColorStop(0.45, '#08050acc'); g.addColorStop(1, '#08050a00');
+        c.fillStyle = g; c.beginPath(); c.ellipse(dc.x, dc.y + 3, dc.r, dc.r * 0.24, 0, 0, 7); c.fill();
+      } else {
+        c.strokeStyle = '#09060e'; c.lineWidth = 3.5; c.lineCap = 'round';
+        for (let i = -2; i <= 2; i++) {
+          c.beginPath(); c.moveTo(dc.x, dc.y + 3);
+          c.lineTo(dc.x + i * dc.r * 0.42, dc.y + 3 + (i % 2 ? 7 : 3));
+          c.lineTo(dc.x + i * dc.r * 0.68, dc.y + 2);
+          c.stroke();
+        }
+        c.strokeStyle = dc.color; c.lineWidth = 1.4; c.globalAlpha = fade * 0.45;
+        c.beginPath(); c.ellipse(dc.x, dc.y + 3, dc.r * 0.75, dc.r * 0.16, 0, 0, 7); c.stroke();
+      }
+      c.restore();
+    });
     this.warns.forEach((w) => {
       const k = 1 - w.t / w.max;
       c.save(); c.strokeStyle = w.color; c.fillStyle = w.color; c.shadowColor = w.color; c.shadowBlur = 18; c.lineWidth = 3;
@@ -2173,6 +2338,12 @@ export class Game {
         const my = w.y - (1 - k) * 520 - 40;
         this.drawOrb(w.x, my, 46, '#ff6d00');
         c.fillStyle = '#3e1a0d'; c.beginPath(); c.arc(w.x, my, 24, 0, 7); c.fill();
+      } else if (w.name === 'cursemaw') {
+        c.fillStyle = '#120520';
+        for (let i = -3; i <= 3; i++) {
+          const fx = w.x + i * (w.r * 0.24), fh = 12 + k * 24;
+          c.beginPath(); c.moveTo(fx - 7, w.y + 3); c.lineTo(fx, w.y - fh); c.lineTo(fx + 7, w.y + 3); c.closePath(); c.fill();
+        }
       }
       c.restore();
     });
@@ -2389,6 +2560,13 @@ export class Game {
   }
   drawProj(p) {
     const c = this.c, sg = Math.sign(p.vx) || p.face || 1;
+    const sy = this.surfaceBelow(p.x, p.y);
+    if (sy !== null && sy > p.y) {
+      const sk = Math.max(0.25, 1 - (sy - p.y) / 280);
+      c.save(); c.fillStyle = `rgba(0,0,0,${0.28 * sk})`;
+      c.beginPath(); c.ellipse(p.x, sy + 3, Math.max(12, p.r * 1.1) * sk, 5 * sk, 0, 0, 7); c.fill();
+      c.restore();
+    }
     if (p.kind === 'dog') {
       c.save(); c.translate(p.x, p.y); c.scale(sg, 1); c.shadowColor = p.color; c.shadowBlur = 16; c.fillStyle = '#0a0a12'; c.strokeStyle = p.color; c.lineWidth = 2;
       c.beginPath(); c.ellipse(0, 0, 30, 14, 0, 0, 7); c.fill(); c.stroke(); c.beginPath(); c.arc(30, -8, 12, 0, 7); c.fill(); c.stroke();
@@ -2406,6 +2584,26 @@ export class Game {
       c.save(); c.translate(p.x, p.y); c.scale(sg, 1); c.shadowColor = p.color; c.shadowBlur = 14; c.fillStyle = '#fff';
       c.beginPath(); c.moveTo(20, 0); c.lineTo(-18, -3); c.lineTo(-22, -6); c.lineTo(-22, 6); c.lineTo(-18, 3); c.closePath(); c.fill();
       c.strokeStyle = p.color; c.lineWidth = 2; c.beginPath(); c.moveTo(-18, 0); c.lineTo(-65, 0); c.stroke(); c.restore(); return;
+    }
+    if (p.style === 'gavelseal') {
+      c.save(); c.translate(p.x, p.y); c.rotate(this.time * 9); c.shadowColor = '#ffd24a'; c.shadowBlur = 18;
+      c.strokeStyle = '#ffd24a'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, p.r, 0, 7); c.stroke();
+      c.fillStyle = 'rgba(255,210,74,0.22)'; c.fill();
+      c.fillStyle = '#fff'; c.fillRect(-10, -4, 20, 8); c.fillRect(-2, -4, 4, 16);
+      c.restore(); return;
+    }
+    if (p.style === 'repel') {
+      this.drawOrb(p.x, p.y, p.r * 1.65, '#9ccc65');
+      c.save(); c.translate(p.x, p.y); c.scale(sg, 1);
+      c.fillStyle = '#203818'; c.strokeStyle = '#b2ff59'; c.lineWidth = 3; c.shadowColor = '#b2ff59'; c.shadowBlur = 16;
+      c.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const an = (i / 8) * Math.PI * 2 + this.time * 6, rr = p.r * (i % 2 ? 0.65 : 1.05);
+        i === 0 ? c.moveTo(Math.cos(an) * rr, Math.sin(an) * rr) : c.lineTo(Math.cos(an) * rr, Math.sin(an) * rr);
+      }
+      c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(8, -6, 3.5, 0, 7); c.arc(-6, 7, 3, 0, 7); c.fill();
+      c.restore(); return;
     }
     if (p.style === 'firearrow') {
       this.drawOrb(p.x, p.y, p.r * 2.1, p.color);
@@ -2484,24 +2682,80 @@ export class Game {
       c.strokeStyle = '#111'; c.lineWidth = 2; c.beginPath(); c.moveTo(hx - 11, hy - 8); c.lineTo(hx + 11, hy - 8); c.stroke();
     }
   }
-  drawRig(R, col, alpha, face, ko, gear) {
+  drawRig(R, col, alpha, face, ko, gear, atk = false) {
     const c = this.c, L = (a, b) => { c.beginPath(); c.moveTo(R[a].x, R[a].y); c.lineTo(R[b].x, R[b].y); c.stroke(); };
-    c.save(); c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 8; c.lineCap = 'round'; c.lineJoin = 'round'; c.shadowColor = col; c.shadowBlur = 14;
-    c.globalAlpha = alpha * 0.7; L('hip', 'kB'); L('kB', 'fB'); L('neck', 'eB'); L('eB', 'hB');
-    c.globalAlpha = alpha; c.lineWidth = 9; L('neck', 'hip'); c.lineWidth = 8;
-    c.fillStyle = '#0b0b14'; c.beginPath(); c.arc(R.head.x, R.head.y, 15, 0, 7); c.fill(); c.stroke(); c.fillStyle = col;
-    if (ko) { c.lineWidth = 2; c.beginPath(); c.moveTo(R.head.x + face * 3, R.head.y - 5); c.lineTo(R.head.x + face * 9, R.head.y); c.moveTo(R.head.x + face * 9, R.head.y - 5); c.lineTo(R.head.x + face * 3, R.head.y); c.stroke(); c.lineWidth = 8; }
-    else { c.beginPath(); c.arc(R.head.x + face * 6, R.head.y - 2, 2.5, 0, 7); c.fill(); }
-    L('hip', 'kF'); L('kF', 'fF'); L('neck', 'eF'); L('eF', 'hF');
-    ['kF', 'eF', 'kB', 'eB'].forEach((n) => { c.beginPath(); c.arc(R[n].x, R[n].y, 4.5, 0, 7); c.fill(); });
+    c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+    /* Back limbs + dark depth outline for physical silhouette */
+    c.strokeStyle = '#07040d'; c.lineWidth = 11.5; c.globalAlpha = alpha * 0.65;
+    L('hip', 'kB'); L('kB', 'fB'); L('neck', 'eB'); L('eB', 'hB');
+    c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 7.5; c.shadowColor = col; c.shadowBlur = 14;
+    c.globalAlpha = alpha * 0.72; L('hip', 'kB'); L('kB', 'fB'); L('neck', 'eB'); L('eB', 'hB');
+    /* Torso outer rim + athletic core */
+    c.globalAlpha = alpha;
+    c.strokeStyle = '#07040d'; c.lineWidth = 13.5; L('neck', 'hip');
+    c.strokeStyle = col; c.lineWidth = 9.5; L('neck', 'hip');
+    /* Head + fierce battle eye */
+    c.fillStyle = '#0b0b14'; c.lineWidth = 8; c.beginPath(); c.arc(R.head.x, R.head.y, 15, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = col;
+    if (ko) {
+      c.lineWidth = 2.2; c.beginPath(); c.moveTo(R.head.x + face * 3, R.head.y - 5); c.lineTo(R.head.x + face * 9, R.head.y); c.moveTo(R.head.x + face * 9, R.head.y - 5); c.lineTo(R.head.x + face * 3, R.head.y); c.stroke();
+    } else if (atk) {
+      c.beginPath(); c.moveTo(R.head.x + face * 3, R.head.y - 4); c.lineTo(R.head.x + face * 10, R.head.y - 1.5); c.lineTo(R.head.x + face * 4, R.head.y + 1); c.closePath(); c.fill();
+    } else {
+      c.beginPath(); c.arc(R.head.x + face * 6, R.head.y - 2, 2.7, 0, 7); c.fill();
+    }
+    /* Front limbs with depth rim + fists & footwear */
+    c.shadowBlur = 0; c.strokeStyle = '#07040d'; c.lineWidth = 11.5; L('hip', 'kF'); L('kF', 'fF'); L('neck', 'eF'); L('eF', 'hF');
+    c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 14; c.lineWidth = 8; L('hip', 'kF'); L('kF', 'fF'); L('neck', 'eF'); L('eF', 'hF');
+    ['kF', 'eF', 'kB', 'eB'].forEach((n) => { c.beginPath(); c.arc(R[n].x, R[n].y, 4.4, 0, 7); c.fill(); });
+    /* Footwear & fists */
+    c.fillRect(R.fF.x - 4 + face * 2, R.fF.y - 3, 10, 5);
+    c.fillRect(R.fB.x - 4 + face * 2, R.fB.y - 3, 9, 4.5);
+    c.beginPath(); c.arc(R.hF.x, R.hF.y, 4.8, 0, 7); c.arc(R.hB.x, R.hB.y, 4.2, 0, 7); c.fill();
     this.drawSkinGear(R, col, face, gear);
+    c.restore();
+  }
+  drawWeapon(f) {
+    const a = f.act, R = f.rig; if (!a || !R || f.ko) return;
+    const c = this.c, ang = Math.atan2(R.hF.y - R.eF.y, R.hF.x - R.eF.x), name = a.name;
+    c.save(); c.translate(R.hF.x, R.hF.y); c.rotate(ang);
+    if (name === 'soulsplit') {
+      c.shadowColor = '#a7ffeb'; c.shadowBlur = 18; c.strokeStyle = '#fff'; c.fillStyle = '#0f2027'; c.lineWidth = 2.5;
+      c.beginPath(); c.moveTo(-4, -3); c.lineTo(54, -2); c.lineTo(62, 0); c.lineTo(54, 3); c.lineTo(-4, 3); c.closePath(); c.fill(); c.stroke();
+      c.strokeStyle = '#ff6bd6'; c.lineWidth = 4; c.beginPath(); c.arc(-6, 0, 6, 0, 7); c.stroke();
+    } else if (name === 'invspear' || name === 'executioner') {
+      const col = name === 'executioner' ? '#ffd24a' : '#cfd8dc';
+      c.shadowColor = col; c.shadowBlur = 20; c.fillStyle = '#fff'; c.strokeStyle = col; c.lineWidth = 2.5;
+      c.beginPath(); c.moveTo(0, -6); c.lineTo(58, 0); c.lineTo(0, 6); c.closePath(); c.fill(); c.stroke();
+    } else if (name === 'gavel') {
+      c.shadowColor = '#ffd24a'; c.shadowBlur = 18; c.strokeStyle = '#d7ccc8'; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(-6, 0); c.lineTo(36, 0); c.stroke();
+      c.fillStyle = '#ffd24a'; c.strokeStyle = '#fff'; c.lineWidth = 2;
+      c.fillRect(28, -18, 18, 36); c.strokeRect(28, -18, 18, 36);
+    } else if (name === 'cleave' || name === 'ratio' || name === 'collapse') {
+      c.shadowColor = '#ffd54f'; c.shadowBlur = 14; c.fillStyle = '#eceff1'; c.strokeStyle = '#fff'; c.lineWidth = 2;
+      c.fillRect(2, -7, 36, 13); c.strokeRect(2, -7, 36, 13);
+      c.strokeStyle = '#ff2d55'; c.lineWidth = 3; c.beginPath(); c.moveTo(12, -7); c.lineTo(12, 6); c.moveTo(24, -7); c.lineTo(24, 6); c.stroke();
+    } else if (name === 'playful') {
+      c.shadowColor = '#ff5252'; c.shadowBlur = 14; c.strokeStyle = '#ff1744'; c.lineWidth = 5;
+      c.beginPath(); c.moveTo(-18, -10); c.lineTo(10, 0); c.lineTo(38, 14); c.stroke();
+    } else if (name === 'nailhammer' || name === 'hairpin' || name === 'resonance') {
+      c.shadowColor = '#ff6bd6'; c.shadowBlur = 12; c.strokeStyle = '#8d6e63'; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(24, 0); c.stroke();
+      c.fillStyle = '#ff6bd6'; c.fillRect(20, -10, 10, 20);
+    }
     c.restore();
   }
   drawFighter(f) {
     const c = this.c, col = f.flash > 0 ? '#fff' : (f.mahoraga > 0 ? '#f5efe0' : f.color), a = f.act, sp = a && spec(a.name);
     if (f.floorY !== null && !f.ledge) {
       const k = Math.max(0.3, 1 - Math.max(0, f.floorY - f.y) / 300);
-      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(f.x, f.floorY + 4, 30 * k, 7 * k, 0, 0, 7); c.fill();
+      c.fillStyle = `rgba(0,0,0,${0.42 * k})`; c.beginPath(); c.ellipse(f.x, f.floorY + 4, 32 * k, 8 * k, 0, 0, 7); c.fill();
+    }
+    if (f.hp > 0 && f.hp <= 30 && !f.ko) {
+      c.save(); c.globalAlpha = 0.22 + 0.14 * Math.sin(this.time * 12);
+      c.strokeStyle = '#ff1744'; c.lineWidth = 2.5;
+      c.beginPath(); c.ellipse(f.x, f.y - 64, 42, 74, 0, 0, 7); c.stroke(); c.restore();
     }
     if (f.mahoraga > 0) {
       c.save();
@@ -2509,7 +2763,16 @@ export class Game {
       c.beginPath(); c.ellipse(f.x, f.y - 68, 56, 88, 0, 0, 7); c.stroke();
       c.restore();
     }
-    this.drawRig(f.rig, col, f.inv > 0 && f.flash <= 0 && f.act?.name !== 'domain' ? 0.65 : 1, f.face, f.ko, f.gear);
+    this.drawRig(f.rig, col, f.inv > 0 && f.flash <= 0 && f.act?.name !== 'domain' ? 0.65 : 1, f.face, f.ko, f.gear, !!a);
+    this.drawWeapon(f);
+    if ((f.nails || 0) > 0 && !f.ko && f.rig) {
+      c.save(); c.strokeStyle = '#ff6bd6'; c.shadowColor = '#ff6bd6'; c.shadowBlur = 10; c.lineWidth = 2.5;
+      for (let i = 0; i < f.nails; i++) {
+        const ny = f.rig.hip.y - 28 + (i % 3) * 14, nx = f.x + ((i % 2 ? 1 : -1) * 11);
+        c.beginPath(); c.moveTo(nx, ny); c.lineTo(nx + (i % 2 ? 16 : -16), ny - 8); c.stroke();
+      }
+      c.restore();
+    }
     if (f.mahoraga > 0 && !f.ko && f.rig) {
       const R = f.rig, spin = this.time * 1.4 + (f.adaptSpin > 0 ? (0.48 - f.adaptSpin) * 16 : 0);
       c.save();

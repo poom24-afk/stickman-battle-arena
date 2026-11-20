@@ -1,5 +1,6 @@
 let ctx;
 const ac = () => {
+  if (typeof window === 'undefined') return null;
   if (!ctx) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; ctx = new A(); }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
@@ -67,6 +68,11 @@ export const sfx = {
   gavel: () => { tone(110, 40, 0.25, 'square', 0.25); noise(0.2, 0.3); },
   resist: () => tone(400, 300, 0.05, 'triangle', 0.06),
   wheel: () => { tone(520, 1040, 0.14, 'triangle', 0.16); tone(1280, 1560, 0.22, 'sine', 0.1); noise(0.06, 0.1); },
+  land: () => { tone(85, 34, 0.13, 'sine', 0.16); noise(0.09, 0.14); },
+  whoosh: () => { noise(0.16, 0.12); tone(380, 160, 0.16, 'sine', 0.06); },
+  clang: () => { tone(1180, 740, 0.16, 'triangle', 0.18); tone(1760, 1320, 0.14, 'sine', 0.1); noise(0.06, 0.08); },
+  splash: () => { noise(0.28, 0.18); tone(260, 95, 0.22, 'sine', 0.12); },
+  seal: () => { tone(740, 370, 0.22, 'triangle', 0.14); tone(1110, 555, 0.18, 'sine', 0.09); },
   victory: () => { tone(110, 55, 0.6, 'sawtooth', 0.18); tone(440, 660, 0.45, 'triangle', 0.15); setTimeout(() => { tone(554, 880, 0.55, 'triangle', 0.16); tone(880, 1320, 0.6, 'sine', 0.12); }, 180); },
   ko: () => { tone(400, 60, 0.8, 'sawtooth', 0.2); noise(0.5, 0.2); },
 };
