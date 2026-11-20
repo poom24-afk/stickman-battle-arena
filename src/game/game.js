@@ -687,16 +687,15 @@ export class Game {
     if (this.phase === 'fight' && !this.cutscene) {
       const gone = (f) => f.ko || f.y > H + 100;
       for (const f of this.fighters) {
-        if (!f.ko && (f.y > H + 100 || (f.hp <= 0 && f.dizzy <= 0))) {
-          const teamStillAlive = this.fighters.some((m) => m.team === f.team && m !== f && !gone(m) && m.hp > 0);
-          if (f.y <= H + 80 && f.hp <= 0 && !teamStillAlive) {
-            f.dizzy = 2.4; f.hp = 0; f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null;
-            f.stun = 0; f.ragdollT = 0; f.vx = 0; f.vy = Math.min(0, f.vy);
-            this.sfx.clash(); this.ring(f.x, f.y - 80, 190, '#ffd24a');
-            this.texts.push({ txt: 'FINISH THEM!', x: clamp(f.x, 120, this.worldW - 120), y: Math.max(150, f.y - 165), t: 1.2, max: 1.2, color: '#ffd24a', size: 36 });
-          } else if (teamStillAlive || f.y > H + 100) {
+        if (!f.ko) {
+          if (f.y > H + 100) {
             f.ko = true; f.hp = 0; f.dizzy = 0; f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null;
             this.sfx.ko(); this.texts.push({ txt: `${f.tag} K.O.!`, x: clamp(f.x, 120, this.worldW - 120), y: Math.min(f.y - 120, H - 80), t: 1.1, max: 1.1, color: '#ff5252', size: 34 });
+          } else if (f.hp <= 1 && f.dizzy <= 0) {
+            f.dizzy = 3.2; f.hp = 1; f.inv = 0.45; f.act = null; f.blocking = false; f.parryT = 0; f.climbing = false; f.ledge = null;
+            f.stun = 0; f.ragdollT = 0; f.vx = 0; f.vy = Math.min(0, f.vy);
+            this.sfx.clash(); this.ring(f.x, f.y - 80, 190, '#ffd24a');
+            this.texts.push({ txt: 'DIZZY 1%! FINISH THEM!', x: clamp(f.x, 120, this.worldW - 120), y: Math.max(150, f.y - 165), t: 1.3, max: 1.3, color: '#ffd24a', size: 32 });
           }
         }
       }
@@ -740,9 +739,9 @@ export class Game {
   }
   finishTarget(f) {
     if (!f || f.ko || f.dizzy > 0) return null;
-    const list = this.fighters.filter((e) => e.team !== f.team && !e.ko && e.y <= H + 80 && (e.hp <= 30 || e.dizzy > 0) && Math.abs(e.x - f.x) < 760);
+    const list = this.fighters.filter((e) => e.team !== f.team && !e.ko && e.dizzy > 0 && Math.abs(e.x - f.x) <= 95 && Math.abs(e.y - f.y) <= 95);
     if (!list.length) return null;
-    list.sort((a, b) => (b.dizzy > 0 ? 1 : 0) - (a.dizzy > 0 ? 1 : 0) || Math.abs(a.x - f.x) - Math.abs(b.x - f.x));
+    list.sort((a, b) => Math.abs(a.x - f.x) - Math.abs(b.x - f.x));
     return list[0];
   }
   step(f, o, dt, can) {
@@ -1774,6 +1773,7 @@ export class Game {
       if (d.dotT <= 0) {
         d.dotT = 0.55;
         enemies.forEach((t) => {
+          if (t.dizzy > 0) return;
           const blkMul = D.ability === 'slash' ? (t.blocking ? 0.85 : 1) : (t.blocking ? 0.5 : 1);
           const chip = this.adaptHit(t, `dom:${d.id}`, (D.dot || 1.4) * (d.mult || 1) * (f.pas.dmg || 1) * blkMul);
           t.lastHitBy = f.i;
@@ -1921,6 +1921,7 @@ export class Game {
     f.ce = 0;
     this.sfx.hit(); this.shake = tk.final ? 22 : 6;
     enemies.forEach((o) => {
+      if (o.dizzy > 0) return;
       const dir = o.x >= f.x ? 1 : -1;
       const tickDmg = this.adaptHit(o, `dom:${d.id}`, tk.dmg * (d.mult || 1) * rm * (1 - d.resist) * (f.pas.dmg || 1));
       o.lastHitBy = f.i; o.hp = Math.max(0, o.hp - tickDmg); o.flash = 0.1; o.inv = 0;
@@ -2231,18 +2232,23 @@ export class Game {
     c.restore();
   }
   drawFinisherTargets() {
-    const c = this.c, pulse = 0.7 + 0.3 * Math.sin(this.time * 14);
+    const c = this.c, pulse = 0.72 + 0.28 * Math.sin(this.time * 14);
     this.fighters.forEach((f) => {
-      if (f.ko || f.y > H + 80 || (f.hp > 30 && f.dizzy <= 0)) return;
+      if (f.ko || f.dizzy <= 0) return;
       const att = this.fighters.find((a) => a.team !== f.team && !a.ko && (!this.net || a.i === this.mySlot));
       const key = att ? (this.hints[att.i] || this.hints[0])[6] : this.hints[0][6];
-      const y = f.y - 165, isDizzy = f.dizzy > 0;
+      const inRange = !!att && Math.abs(att.x - f.x) <= 95 && Math.abs(att.y - f.y) <= 95;
+      const y = f.y - 145;
       c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.globalAlpha = pulse; c.strokeStyle = isDizzy ? '#ff1744' : '#ffd24a'; c.lineWidth = 3;
+      for (let i = 0; i < 3; i++) {
+        const an = this.time * 6 + (i * Math.PI * 2) / 3;
+        c.fillStyle = '#ffd24a'; c.beginPath(); c.arc(f.x + Math.cos(an) * 24, f.y - 114 + Math.sin(an) * 7, 3.5, 0, 7); c.fill();
+      }
+      c.globalAlpha = pulse; c.strokeStyle = inRange ? '#ffd24a' : '#ff5252'; c.lineWidth = 3;
       c.beginPath(); c.moveTo(f.x, y - 16); c.lineTo(f.x + 14, y); c.lineTo(f.x, y + 16); c.lineTo(f.x - 14, y); c.closePath(); c.stroke();
       c.font = `13px ${FONT}`; c.lineWidth = 4; c.strokeStyle = '#000';
-      const msg = isDizzy ? `FINISH! [${key}]` : `EXECUTE [${key}]`;
-      c.strokeText(msg, f.x, y - 28); c.fillStyle = isDizzy ? '#ff5252' : '#ffd24a'; c.fillText(msg, f.x, y - 28);
+      const msg = inRange ? `⚡ FINISH! [${key}]` : `เข้าใกล้เพื่อปิดฉาก [${key}]`;
+      c.strokeText(msg, f.x, y - 28); c.fillStyle = inRange ? '#ffd24a' : '#ff8a80'; c.fillText(msg, f.x, y - 28);
       c.restore();
     });
   }
@@ -2933,12 +2939,13 @@ export class Game {
         c.textAlign = 'center'; c.font = `10px ${FONT}`; c.fillStyle = ready ? '#000' : '#fff'; c.fillText(`[${hf[s]}] ${sk2.short}${ready ? '' : ' ' + f.cd[s].toFixed(1)}`, sx + tw / 2, 112);
       }
       const ft = this.phase === 'fight' ? this.finishTarget(f) : null;
+      const anyEnemyDizzy = this.phase === 'fight' && this.fighters.some((e) => e.team !== f.team && !e.ko && e.dizzy > 0);
       const finX = i ? x + w - 210 : x, finW = 210;
       c.save(); this.pg(finX, 130, finW, 20, 6); c.clip();
-      c.fillStyle = ft ? (0.65 + 0.35 * Math.sin(this.time * 14) > 0.8 ? '#ffd24a' : '#ff1744') : '#120a22aa';
+      c.fillStyle = ft ? (0.65 + 0.35 * Math.sin(this.time * 14) > 0.8 ? '#ffd24a' : '#ff1744') : anyEnemyDizzy ? '#4a1428' : '#120a22aa';
       c.fillRect(finX - 10, 130, finW + 20, 20); c.restore();
-      this.pg(finX, 130, finW, 20, 6); c.strokeStyle = ft ? '#ffd24a' : '#ffffff44'; c.lineWidth = ft ? 2 : 1; c.stroke();
-      label(ft ? `⚡ ปิดฉาก [${hf[6]}] READY!` : `☠ ปิดฉาก [${hf[6]}] (HP≤30%)`, finX + finW / 2, 140, 10, ft ? '#000' : '#ffffff88', 'center');
+      this.pg(finX, 130, finW, 20, 6); c.strokeStyle = ft ? '#ffd24a' : anyEnemyDizzy ? '#ff5252' : '#ffffff44'; c.lineWidth = ft ? 2 : 1; c.stroke();
+      label(ft ? `⚡ ปิดฉาก [${hf[6]}] READY!` : anyEnemyDizzy ? `เข้าใกล้เพื่อปิดฉาก [${hf[6]}]` : `☠ ปิดฉาก [${hf[6]}] (ติดมึน 1%)`, finX + finW / 2, 140, 10, ft ? '#000' : anyEnemyDizzy ? '#ffd24a' : '#ffffff88', 'center');
       others.forEach((m, idx) => {
         const mw = 250, mx = i ? W - 40 - mw : 40, msk = i ? -10 : 10, mat = (wd) => (i ? mx + mw - wd : mx), mhpw = (v) => (mw * v) / 100;
         const y0 = 166 + idx * 38;
