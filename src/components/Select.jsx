@@ -340,12 +340,13 @@ export default function Select({ cfg, setCfg, onStart, onBack, onSettings, onlin
           );
         })}
       </div>
-      <h3 className="sub">สนามต่อสู้ {isGuest ? '(หัวหน้าห้องเป็นคนเลือก)' : ''}</h3>
+      <h3 className="sub">สนามต่อสู้ ({ARENAS.length} แมพ) {isGuest ? '(หัวหน้าห้องเป็นคนเลือก)' : ''}</h3>
       <div className="arenas">
         {ARENAS.map((a, i) => (
-          <button key={a.id} disabled={isGuest} className={'arena-card' + (cfg.arena === i ? ' on' : '')} style={{ background: `linear-gradient(${a.top}, ${a.bot})`, '--c': a.edge }}
+          <button key={a.id} disabled={isGuest} className={'arena-card' + (cfg.arena === i ? ' on' : '')} style={{ background: `linear-gradient(155deg, ${a.top}, ${a.bot})`, '--c': a.edge }}
             onClick={() => !isGuest && setCfg((c) => ({ ...c, arena: i }))}>
-            {a.name}{a.climbs ? ' ⛰' : ''}
+            <span className="arena-title">{a.name}{a.climbs ? ' ⛰' : a.platforms ? ' ▤' : ''}</span>
+            <small className="arena-sub">{a.sub}</small>
           </button>
         ))}
       </div>

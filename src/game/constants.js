@@ -174,10 +174,12 @@ export const DOMAINS = {
 };
 export const DOMAIN_IDS = Object.keys(DOMAINS);
 
-/* ด่าน 10 แบบ ข้อมูลล้วน วาดโดย drawBg (รวมด่านเกาะลอยฟ้าที่มีจุดปีน!) */
+/* ด่าน 14 แบบ สวยงาม หลากหลายมิติ (รวมด่านหลายชั้นที่มีบันได เชือก โซ่!) */
 export const ARENAS = [
-  { id: 'neon', name: 'Neon City', top: '#0a0030', bot: '#ff0080', floor: '#1a1033', edge: '#00e5ff', orbs: [{ x: 640, y: 340, r: 150, c: '#ffee58' }], city: { c: '#100826', w: ['#00e5ff', '#ff4081'] } },
-  { id: 'skyisle', name: 'Floating Sanctum', top: '#0c1c3d', bot: '#69e2ff', floor: '#324256', edge: '#7dffb3', orbs: [{ x: 640, y: 190, r: 210, c: '#a7ffeb' }], clouds: true, stars: true,
+  { id: 'neon', name: 'Neon City', sub: 'มหานครไซเบอร์ฝนตก · 2 ชั้น', top: '#070224', bot: '#d5006d', floor: '#140c29', edge: '#00e5ff', orbs: [{ x: 640, y: 240, r: 220, c: '#ff2d95' }, { x: 260, y: 190, r: 120, c: '#00e5ff' }], city: { c: '#0d0620', w: ['#00e5ff', '#ff4081'], roof: true }, extra: 'neon', parts: { t: 'rain', c: '#80d8ff' },
+    platforms: [{ x1: 95, x2: 315, y: 410, theme: 'metal' }, { x1: 965, x2: 1185, y: 410, theme: 'metal' }],
+    climbs: [{ x: 205, y1: 410, y2: 560, kind: 'ladder' }, { x: 1075, y1: 410, y2: 560, kind: 'ladder' }] },
+  { id: 'skyisle', name: 'Floating Sanctum', sub: 'เกาะลอยฟ้าโบราณ · 5 เกาะ', top: '#091836', bot: '#56d8ff', floor: '#2b3d4f', edge: '#7dffb3', orbs: [{ x: 640, y: 185, r: 230, c: '#a7ffeb' }], clouds: true, stars: true,
     parts: { t: 'petal', c: '#b9f6ca' }, extra: 'sanctum',
     platforms: [
       { x1: 55, x2: 245, y: 445, theme: 'isle' },
@@ -192,14 +194,38 @@ export const ARENAS = [
       { x: 560, y1: 245, y2: 560, kind: 'chain' },
       { x: 720, y1: 245, y2: 560, kind: 'chain' },
     ] },
-  { id: 'volcano', name: 'Volcano Arena', top: '#1a0500', bot: '#ff4500', floor: '#2b1109', edge: '#ff9100', orbs: [{ x: 640, y: 230, r: 190, c: '#ff6d00' }], mount: [{ c: '#1b0a06', base: 60, amp: 260, f: 0.0045, s: 1.2 }], parts: { t: 'ember', c: '#ffab40' }, extra: 'lava' },
-  { id: 'sky', name: 'Sky Temple', top: '#1e3c72', bot: '#ffd1a9', floor: '#8d7b68', edge: '#fff59d', orbs: [{ x: 960, y: 200, r: 190, c: '#fff59d' }], clouds: true, extra: 'columns' },
-  { id: 'shibuya', name: 'Shibuya Ruins', top: '#12001f', bot: '#7a1030', floor: '#241a28', edge: '#ff5252', orbs: [{ x: 300, y: 220, r: 130, c: '#ff8a80' }], city: { c: '#0b0610', w: ['#ff9100', '#ff5252'], broken: true }, parts: { t: 'ash', c: '#b0a0a8' } },
-  { id: 'jjkhigh', name: 'Jujutsu High', top: '#3b1a5a', bot: '#ff9a5a', floor: '#3a2a20', edge: '#ffd180', orbs: [{ x: 640, y: 300, r: 170, c: '#ffe0b2' }], mount: [{ c: '#2a1838', base: 140, amp: 150, f: 0.004, s: 2 }, { c: '#1b0f26', base: 40, amp: 110, f: 0.006, s: 5 }], extra: 'torii', parts: { t: 'petal', c: '#ffb7c5' } },
-  { id: 'colony', name: 'Culling Colony', top: '#001a14', bot: '#00c97a', floor: '#02241c', edge: '#00ffa6', city: { c: '#03140f', w: ['#00ffa6', '#00b8d4'] }, extra: 'grid', parts: { t: 'data', c: '#00ff9d' } },
-  { id: 'void', name: 'Infinite Void', top: '#000010', bot: '#4a148c', floor: '#10002a', edge: '#ffffff', stars: true, orbs: [{ x: 420, y: 260, r: 230, c: '#7c4dff' }, { x: 900, y: 380, r: 190, c: '#00e5ff' }] },
-  { id: 'tundra', name: 'Frozen Peak', top: '#06142e', bot: '#7fd8ff', floor: '#cfe9f5', edge: '#ffffff', stars: true, mount: [{ c: '#1c3a5e', base: 120, amp: 240, f: 0.004, s: 3 }, { c: '#2d5f8f', base: 40, amp: 140, f: 0.007, s: 7 }], extra: 'aurora', parts: { t: 'snow', c: '#ffffff' } },
-  { id: 'graves', name: 'Cursed Graveyard', top: '#0a0010', bot: '#3d0a2e', floor: '#1c1424', edge: '#b388ff', orbs: [{ x: 640, y: 230, r: 150, c: '#ff1744' }], extra: 'graves', parts: { t: 'ash', c: '#b388ff' } },
+  { id: 'subway', name: 'Shibuya Subway', sub: 'สถานีใต้ดินชิบูย่า · สะพานเหล็ก', top: '#090b10', bot: '#232836', floor: '#242730', edge: '#ffd24a', orbs: [{ x: 640, y: 170, r: 160, c: '#ffe082' }], extra: 'subway',
+    platforms: [
+      { x1: 140, x2: 430, y: 385, theme: 'metal' },
+      { x1: 850, x2: 1140, y: 385, theme: 'metal' },
+      { x1: 495, x2: 785, y: 270, theme: 'metal' },
+    ],
+    climbs: [
+      { x: 285, y1: 385, y2: 560, kind: 'ladder' },
+      { x: 995, y1: 385, y2: 560, kind: 'ladder' },
+      { x: 640, y1: 270, y2: 560, kind: 'chain' },
+    ] },
+  { id: 'volcano', name: 'Volcano Arena', sub: 'ปากปล่องภูเขาไฟ · หินออบซิเดียน', top: '#140300', bot: '#e63e00', floor: '#260d07', edge: '#ff9100', orbs: [{ x: 640, y: 220, r: 220, c: '#ff6d00' }], mount: [{ c: '#1f0905', base: 85, amp: 270, f: 0.0042, s: 1.2 }, { c: '#120503', base: 30, amp: 145, f: 0.007, s: 3.5 }], parts: { t: 'ember', c: '#ffab40' }, extra: 'lava',
+    platforms: [{ x1: 110, x2: 310, y: 425, theme: 'obsidian' }, { x1: 970, x2: 1170, y: 425, theme: 'obsidian' }],
+    climbs: [{ x: 210, y1: 425, y2: 560, kind: 'chain' }, { x: 1070, y1: 425, y2: 560, kind: 'chain' }] },
+  { id: 'sky', name: 'Sky Temple', sub: 'วิหารเทพเจ้ากลางเมฆ · แสงอาทิตย์', top: '#143366', bot: '#ffc796', floor: '#7c6d5c', edge: '#fff59d', orbs: [{ x: 940, y: 175, r: 230, c: '#fff59d' }], clouds: true, extra: 'columns', parts: { t: 'feather', c: '#fffde7' } },
+  { id: 'shibuya', name: 'Shibuya Ruins', sub: 'ซากเมืองชิบูย่า · ม่านพลัง Veil', top: '#0f001a', bot: '#6e0c29', floor: '#211825', edge: '#ff5252', orbs: [{ x: 290, y: 205, r: 160, c: '#ff5252' }], city: { c: '#09040e', w: ['#ff9100', '#ff5252'], broken: true }, extra: 'shibuya', parts: { t: 'ash', c: '#cfd8dc' } },
+  { id: 'jjkhigh', name: 'Jujutsu High', sub: 'โรงเรียนไสยเวท · โทริอิ & ซากุระ', top: '#2b1047', bot: '#ff8a5b', floor: '#38261c', edge: '#ffd180', orbs: [{ x: 640, y: 280, r: 195, c: '#ffe0b2' }], mount: [{ c: '#261436', base: 145, amp: 160, f: 0.004, s: 2 }, { c: '#180c24', base: 45, amp: 115, f: 0.006, s: 5 }], extra: 'torii', parts: { t: 'petal', c: '#ffb7c5' },
+    platforms: [{ x1: 85, x2: 290, y: 410, theme: 'wood' }, { x1: 990, x2: 1195, y: 410, theme: 'wood' }] },
+  { id: 'bamboo', name: 'Moonlit Bamboo', sub: 'ป่าไผ่แสงจันทร์ · หิ่งห้อยกลางคืน', top: '#031510', bot: '#12543d', floor: '#1d2b1f', edge: '#aeea00', stars: true, orbs: [{ x: 640, y: 170, r: 190, c: '#e8f5e9' }], extra: 'bamboo', parts: { t: 'firefly', c: '#ccff90' },
+    platforms: [{ x1: 430, x2: 850, y: 390, theme: 'wood' }],
+    climbs: [{ x: 480, y1: 390, y2: 560, kind: 'vine' }, { x: 800, y1: 390, y2: 560, kind: 'vine' }] },
+  { id: 'ocean', name: 'Abyssal Shrine', sub: 'วิหารใต้สมุทร · เงาวาฬยักษ์', top: '#021526', bot: '#045d75', floor: '#143844', edge: '#4dd0e1', orbs: [{ x: 640, y: 120, r: 260, c: '#80deea' }], extra: 'ocean', parts: { t: 'bubble', c: '#b2ebf2' },
+    platforms: [{ x1: 120, x2: 340, y: 415, theme: 'coral' }, { x1: 940, x2: 1160, y: 415, theme: 'coral' }],
+    climbs: [{ x: 230, y1: 415, y2: 560, kind: 'vine' }, { x: 1050, y1: 415, y2: 560, kind: 'vine' }] },
+  { id: 'colony', name: 'Culling Colony', sub: 'เขตจรดล · โดมอาคมดิจิทัล', top: '#00140f', bot: '#00995c', floor: '#032018', edge: '#00ffa6', city: { c: '#02100b', w: ['#00ffa6', '#00b8d4'], roof: true }, extra: 'grid', parts: { t: 'data', c: '#00ff9d' } },
+  { id: 'void', name: 'Infinite Void', sub: 'จักรวาลไร้ขีดจำกัด · หลุมดำ', top: '#01000c', bot: '#390b70', floor: '#0d0024', edge: '#e0f7fa', stars: true, orbs: [{ x: 400, y: 240, r: 240, c: '#7c4dff' }, { x: 920, y: 360, r: 200, c: '#00e5ff' }], extra: 'cosmic' },
+  { id: 'tundra', name: 'Frozen Peak', sub: 'ยอดเขาน้ำแข็ง · แสงเหนือออรอรา', top: '#041026', bot: '#5ec8f2', floor: '#c5e4f3', edge: '#ffffff', stars: true, mount: [{ c: '#163252', base: 125, amp: 245, f: 0.004, s: 3 }, { c: '#265480', base: 45, amp: 145, f: 0.007, s: 7 }], extra: 'aurora', parts: { t: 'snow', c: '#ffffff' },
+    platforms: [{ x1: 140, x2: 360, y: 420, theme: 'ice' }, { x1: 920, x2: 1140, y: 420, theme: 'ice' }] },
+  { id: 'graves', name: 'Cursed Graveyard', sub: 'สุสานต้องคำสาป · จันทร์สีเลือด', top: '#08000e', bot: '#3b072a', floor: '#191122', edge: '#b388ff', stars: true, orbs: [{ x: 640, y: 205, r: 175, c: '#ff1744' }], extra: 'graves', parts: { t: 'ash', c: '#b388ff' } },
+  { id: 'eclipse', name: 'Crimson Eclipse', sub: 'สุริยุปราคาสีชาด · สุสานดาบโบราณ', top: '#180309', bot: '#b71c1c', floor: '#260b10', edge: '#ffd54f', mount: [{ c: '#22060b', base: 70, amp: 185, f: 0.0045, s: 4 }], extra: 'eclipse', parts: { t: 'ember', c: '#ffd54f' },
+    platforms: [{ x1: 470, x2: 810, y: 375, theme: 'obsidian' }],
+    climbs: [{ x: 640, y1: 375, y2: 560, kind: 'chain' }] },
 ];
 
 export const CONTROLS = [

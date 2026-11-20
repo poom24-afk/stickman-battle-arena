@@ -116,9 +116,11 @@ button { font-family: inherit; cursor: pointer; }
 .skill .cut-badge { display: inline-block; margin-right: 5px; padding: 1px 6px; background: var(--gold); color: #000; font-size: 10px; font-weight: 800; border-radius: 2px; vertical-align: middle; }
 .tip { margin: 0 0 8px; font-size: 12px; opacity: .8; } .dline { margin: 10px 0 0; font-size: 12px; opacity: .8; }
 .sub { margin: 4px 0 0; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--blue); }
-.arenas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; width: min(94vw, 760px); }
-.arena-card { --c: #fff; height: 72px; border: 0; color: #fff; font-family: var(--display); font-size: 14px; text-shadow: 0 2px 8px #000; clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); transition: transform .12s; }
-.arena-card:hover { transform: scale(1.04); } .arena-card.on { box-shadow: inset 0 0 0 4px var(--c); } .arena-card:focus-visible { outline: none; box-shadow: inset 0 0 0 4px var(--gold); }
+.arenas { display: grid; grid-template-columns: repeat(auto-fit, minmax(156px, 1fr)); gap: 10px; width: min(94vw, 940px); }
+.arena-card { --c: #fff; min-height: 76px; padding: 8px 14px; border: 0; color: #fff; font-family: var(--display); font-size: 13.5px; text-shadow: 0 2px 8px #000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); transition: transform .12s, box-shadow .12s; border-bottom: 3px solid var(--c); }
+.arena-title { display: block; line-height: 1.15; }
+.arena-sub { font-family: var(--body); font-size: 10.5px; font-weight: 600; opacity: .88; line-height: 1.2; text-shadow: 0 1px 4px #000; }
+.arena-card:hover { transform: scale(1.04); } .arena-card.on { box-shadow: inset 0 0 0 4px var(--c), 0 0 14px var(--c); } .arena-card:focus-visible { outline: none; box-shadow: inset 0 0 0 4px var(--gold); }
 .chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .chip { background: transparent; border: 2px solid #ffffff55; color: #fff; padding: 8px 20px; font-weight: 700; transform: skewX(-8deg); }
 .chip.on { background: var(--gold); border-color: var(--gold); color: #000; } .chips.sm { justify-content: flex-start; margin-bottom: 8px; } .chips.sm .chip { padding: 3px 12px; font-size: 12px; }
