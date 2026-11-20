@@ -1139,7 +1139,7 @@ export class Game {
   }
   /* ---------------- CUTSCENE SYSTEM (10 ท่าคัตซีน!) ---------------- */
   startCutscene(f, o, sp, name) {
-    this.cutscene = { owner: f.i, target: o.i, sp, name, t: 0, dur: CUT_DUR, step: 0, ox: o.x, oy: o.y, qte: { t0: 0.50, t1: 1.08, done: false, ok: false, mul: 1.4 } };
+    this.cutscene = { owner: f.i, target: o.i, sp, name, t: 0, dur: CUT_DUR, step: 0, ox: o.x, oy: o.y, qte: { t0: 0.50, t1: 1.08, done: false, ok: false, mul: 1.25 } };
     f.act = { name, t: 0, fired: true, hit: true }; f.vx = 0; f.vy = 0; f.inv = CUT_DUR + 0.4; f.climbing = false; f.ledge = null; f.qte = null;
     o.act = null; o.vx = 0; o.vy = 0; o.stun = CUT_DUR + 0.4; o.inv = 0; o.climbing = false; o.ledge = null; o.ragdollT = 0;
     this.sfx.cutscene(); this.flash = { t: 0.24, max: 0.24, c: '#fff' }; this.shake = 14;
@@ -1984,15 +1984,15 @@ export class Game {
     if (finisher) { o.dmg *= 1.35; o.kb = Math.max(o.kb, 620); o.vy = 360; o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.85; o.big = true; }
     const da = this.domAbility(att);
     const bfChance = (att.pas.bf || 0) + (da && da.isOwner && da.ability === 'bfzone' ? 0.35 : 0);
-    if (o.basic && bfChance > 0 && Math.random() < bfChance) { o.fx = 'bf'; o.dmg *= 2.2; o.kb = Math.max(o.kb, 750); o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.9; o.big = true; o.color = '#ff1744'; }
+    if (o.basic && bfChance > 0 && Math.random() < bfChance) { o.fx = 'bf'; o.dmg *= 1.75; o.kb = Math.max(o.kb, 750); o.stun = Math.max(o.stun, 0.65); o.ragdoll = 0.9; o.big = true; o.color = '#ff1744'; }
     const domDmg = da && da.isOwner
-      ? (da.ability === 'guilty' ? 1.25 : da.ability === 'nullzone' ? 1.4 : da.ability === 'mutual' ? 1.2 : (da.ability === 'pull' || da.ability === 'clapfest') && o.basic ? 1.35 : 1)
+      ? (da.ability === 'guilty' ? 1.2 : da.ability === 'nullzone' ? 1.25 : da.ability === 'mutual' ? 1.2 : (da.ability === 'pull' || da.ability === 'clapfest') && o.basic ? 1.25 : 1)
       : 1;
-    let dmg = o.dmg * (1 + Math.min(att.combo, 4) * 0.08) * (att.pas.dmg || 1) * (att.mahoraga > 0 ? 1.12 : 1) * (att.amp > 0 ? att.ampMul : 1) * domDmg * (def.pas.guard || 1);
+    let dmg = o.dmg * (1 + Math.min(att.combo, 4) * 0.06) * (att.pas.dmg || 1) * (att.mahoraga > 0 ? 1.12 : 1) * (att.amp > 0 ? att.ampMul : 1) * domDmg * (def.pas.guard || 1);
     if (o.basic && att.pas.basic) dmg *= att.pas.basic;
     const critChance = da && da.isOwner && da.ability === 'ratio73' ? 1 : (att.pas.crit || 0) + (da && da.isOwner && da.ability === 'nails' ? 0.3 : 0);
-    if (critChance > 0 && Math.random() < critChance) { dmg *= 1.6; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
-    dmg = this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg);
+    if (critChance > 0 && Math.random() < critChance) { dmg *= 1.4; this.texts.push({ txt: da?.ability === 'ratio73' ? '7:3 CRIT!' : 'CRIT!', x: hx, y: hy - 130, t: 0.6, max: 0.6, color: '#ffeb3b', size: 30 }); }
+    dmg = Math.min(34, this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg));
     def.lastHitBy = att.i;
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
     def.stun = Math.max(def.stun, o.stun); def.act = null; def.inv = 0.2; def.flash = 0.12;
