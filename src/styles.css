@@ -126,9 +126,16 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- ตั้งปุ่ม ---------- */
 .keyrows { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-.keyrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
-.keybtn { min-width: 120px; padding: 7px 14px; border: 2px solid var(--c); background: #ffffff10; color: #fff; font-family: var(--display); font-size: 13px; }
-.keybtn:hover { background: #ffffff25; } .keybtn.wait { background: var(--c); color: #000; animation: blink .6s infinite alternate; }
+.keyrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13.5px; }
+.keypair { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.keybtn { min-width: 92px; padding: 6px 10px; border: 2px solid var(--c); background: #ffffff10; color: #fff; font-family: var(--display); font-size: 12px; }
+.keybtn.alt { min-width: 64px; border-width: 1px; border-style: dashed; opacity: .82; font-size: 11px; padding: 6px 8px; }
+.keybtn.clr { min-width: 0; width: 26px; padding: 5px 0; border-width: 1px; border-color: #ffffff44; color: #ff8a80; font-size: 13px; }
+.keybtn:hover { background: #ffffff25; opacity: 1; } .keybtn.wait { background: var(--c); color: #000; opacity: 1; animation: blink .6s infinite alternate; }
+.hw-bar { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-items: center; width: min(94vw, 1060px); background: #100820cc; border: 1px solid #ffffff26; padding: 8px 14px; font-size: 12.5px; }
+.hw-bar b { color: var(--gold); }
+.preset-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; width: min(94vw, 1060px); }
+.preset-lbl { font-size: 12.5px; font-weight: 700; color: var(--blue); }
 @keyframes blink { to { opacity: .55; } }
 
 /* ---------- ในสนาม ---------- */

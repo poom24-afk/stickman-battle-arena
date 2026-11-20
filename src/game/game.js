@@ -152,7 +152,7 @@ export class Game {
     };
     this.resetRound();
     this.onKeyDown = (e) => {
-      if (e.code === 'Escape' || e.code === 'KeyP') { if (!e.repeat) this.setPaused(!this.paused); e.preventDefault(); return; }
+      if (e.code === 'Escape' || (e.code === 'KeyP' && !this.allKeys.has('KeyP'))) { if (!e.repeat) this.setPaused(!this.paused); e.preventDefault(); return; }
       if (this.allKeys.has(e.code)) { e.preventDefault(); this.keys.add(e.code); if (this.netRole === 'guest') this.sendGuestInput(); }
     };
     this.onKeyUp = (e) => {
@@ -428,12 +428,24 @@ export class Game {
     }
     return inp;
   }
+  readGamepad(idx) {
+    const pads = navigator.getGamepads?.();
+    const gp = pads ? Array.from(pads).filter(Boolean)[idx] : null;
+    if (!gp) return null;
+    const b = (n) => !!gp.buttons[n]?.pressed;
+    const ax0 = gp.axes[0] || 0, ax1 = gp.axes[1] || 0;
+    return {
+      left: b(14) || ax0 < -0.35, right: b(15) || ax0 > 0.35,
+      jump: b(12) || b(0) || ax1 < -0.5, block: b(13) || b(4) || ax1 > 0.5,
+      punch: b(2), kick: b(1), s1: b(3), s2: b(5), s3: b(7), dom: b(6), fin: b(8) || (b(10) && b(11)),
+    };
+  }
   /* ---------------- ONLINE SYNC ---------------- */
   sendGuestInput() {
-    const c = this.controls[0], held = {}, pulse = {};
+    const c = this.controls[0], gp = this.readGamepad(0), held = {}, pulse = {};
     let hasPulse = false;
     for (const k in c) {
-      const d = c[k].some((x) => this.keys.has(x));
+      const d = c[k].some((x) => this.keys.has(x)) || !!gp?.[k];
       held[k] = d;
       if (d && !this.prev[0][k]) { pulse[k] = true; hasPulse = true; }
       this.prev[0][k] = d;
@@ -759,7 +771,8 @@ export class Game {
         rp[k] = false;
       }
     } else {
-      for (const k in c) { const d = c[k].some((x) => this.keys.has(x)); inp[k] = d && !this.prev[f.i][k]; this.prev[f.i][k] = d; inp['_' + k] = d; }
+      const gp = this.readGamepad(this.net ? 0 : f.i);
+      for (const k in c) { const d = c[k].some((x) => this.keys.has(x)) || !!gp?.[k]; inp[k] = d && !this.prev[f.i][k]; this.prev[f.i][k] = d; inp['_' + k] = d; }
     }
     f.inp = inp; f.aura = Math.max(0, f.aura - dt);
     if (f.dizzy > 0 && !f.ko) {
