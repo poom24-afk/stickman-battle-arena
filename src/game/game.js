@@ -462,7 +462,8 @@ export class Game {
   syncNet() {
     this.flushNetEvents();
     const crucial = this.round !== this._lastSentRound || this.phase !== this._lastSentPhase || this.matchWinner !== null;
-    if (crucial || this.time - this.lastSync >= 0.025) {
+    const rate = this.net.hasRelay?.() ? 0.032 : 0.025;
+    if (crucial || this.time - this.lastSync >= rate) {
       this.lastSync = this.time;
       this.sendSnapshot(crucial);
     }

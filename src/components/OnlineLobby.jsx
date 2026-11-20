@@ -3,7 +3,7 @@ import { useState } from 'react';
 export default function OnlineLobby({ onCreate, onJoin, onBack, connecting, error }) {
   const params = new URLSearchParams(location.search);
   const [code, setCode] = useState(() => params.get('room')?.toUpperCase() || '');
-  const [mode, setMode] = useState(() => (params.get('mode') === 'ws' ? 'ws' : 'p2p'));
+  const [mode, setMode] = useState(() => (['ws', 'relay', 'p2p'].includes(params.get('mode')) ? params.get('mode') : 'p2p'));
 
   const submitJoin = (e) => {
     e.preventDefault();
@@ -15,15 +15,18 @@ export default function OnlineLobby({ onCreate, onJoin, onBack, connecting, erro
       <div className="ghost-kanji" aria-hidden="true">網</div>
       <h2 className="title sm">เล่นออนไลน์</h2>
       <p className="hint">
-        เลือกโหมดเชื่อมต่อ: <b>P2P ข้ามเน็ต (แนะนำ)</b> เล่นข้าม Wi-Fi / 4G / ต่างเครือข่ายได้ทันทีโดยไม่ต้องอยู่ LAN เดียวกัน
-        · หรือใช้โหมด <b>Server (/ws)</b> เมื่อต่อผ่าน LAN / Tunnel
+        เลือกโหมดเชื่อมต่อ: <b>P2P + Auto Relay (แนะนำ)</b> ลองเชื่อมต่อตรงก่อน และถ้าเน็ต/NAT บล็อกจะสลับผ่าน Cloud Relay อัตโนมัติ
+        · หรือเลือก <b>Cloud Relay</b> ทันทีหากเล่นผ่าน 4G/หอพัก
       </p>
       <div className="chips">
         <button className={'chip' + (mode === 'p2p' ? ' on' : '')} onClick={() => setMode('p2p')}>
-          🌐 P2P ข้ามเน็ตทั่วโลก (WebRTC)
+          🌐 P2P + Auto Relay (แนะนำ)
+        </button>
+        <button className={'chip' + (mode === 'relay' ? ' on' : '')} onClick={() => setMode('relay')}>
+          ⚡ Cloud Relay (ทะลุทุกเน็ต 100%)
         </button>
         <button className={'chip' + (mode === 'ws' ? ' on' : '')} onClick={() => setMode('ws')}>
-          🔌 Server Room (/ws · Tunnel/LAN)
+          🔌 Server Room (/ws · LAN)
         </button>
       </div>
       <div className="players">

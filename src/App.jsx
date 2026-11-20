@@ -64,6 +64,8 @@ export default function App() {
   /* สถานะโหมดออนไลน์ (รองรับสูงสุด 4 คนสำหรับ 2v2!) */
   const netRef = useRef(null);
   const [netState, setNetState] = useState(null); // { role, mySlot, code, occupied, ready, myReady, pingMs }
+  const cfgRef = useRef(cfg); cfgRef.current = cfg;
+  const netStateRef = useRef(netState); netStateRef.current = netState;
   const [netErr, setNetErr] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -99,21 +101,16 @@ export default function App() {
       } else if (msg.type === 'peer-joined') {
         const slot = msg.slot ?? 1;
         const occ = msg.occupied || [true, true, false, false];
-        let nextReady;
-        setNetState((s) => {
-          if (!s) return s;
-          const rdy = [...(s.ready || [true, false, false, false])];
-          rdy[slot] = false;
-          nextReady = rdy;
-          return { ...s, occupied: occ, ready: rdy };
-        });
-        setCfg((cur) => {
-          const sm = [...cur.slotModes]; sm[slot] = 'human';
-          const n = normCfg({ ...cur, slotModes: sm, occupied: occ, p2Ai: slot === 1 ? false : cur.p2Ai });
-          net.setHostCfg(n);
-          net.send({ type: 'cfg-sync', cfg: n, occupied: occ, ready: nextReady });
-          return n;
-        });
+        const curNs = netStateRef.current;
+        const nextReady = [...(curNs?.ready || [true, false, false, false])];
+        nextReady[slot] = false;
+        setNetState((s) => (s ? { ...s, occupied: occ, ready: nextReady } : s));
+        const curCfg = cfgRef.current;
+        const sm = [...curCfg.slotModes]; sm[slot] = 'human';
+        const nextCfg = normCfg({ ...curCfg, slotModes: sm, occupied: occ, p2Ai: slot === 1 ? false : curCfg.p2Ai });
+        setCfg(nextCfg);
+        net.setHostCfg(nextCfg);
+        net.send({ type: 'cfg-sync', cfg: nextCfg, occupied: occ, ready: nextReady });
       } else if (msg.type === 'peer-left') {
         const leftSlot = msg.slot ?? 0;
         if (leftSlot === 0 || net.role === 'guest') {
@@ -125,20 +122,16 @@ export default function App() {
           leaveOnline(msg.reason || 'คู่ต่อสู้หลุดการเชื่อมต่อ');
           return;
         }
-        let nextReady;
-        setNetState((s) => {
-          if (!s) return s;
-          const rdy = [...(s.ready || [true, false, false, false])]; rdy[leftSlot] = false;
-          nextReady = rdy;
-          return { ...s, occupied: occ, ready: rdy };
-        });
-        setCfg((cur) => {
-          const sm = [...cur.slotModes]; sm[leftSlot] = leftSlot >= 2 ? 'bot' : 'human';
-          const n = normCfg({ ...cur, slotModes: sm, occupied: occ });
-          net.setHostCfg(n);
-          net.send({ type: 'cfg-sync', cfg: n, occupied: occ, ready: nextReady });
-          return n;
-        });
+        const curNs = netStateRef.current;
+        const nextReady = [...(curNs?.ready || [true, false, false, false])];
+        nextReady[leftSlot] = false;
+        setNetState((s) => (s ? { ...s, occupied: occ, ready: nextReady } : s));
+        const curCfg = cfgRef.current;
+        const sm = [...curCfg.slotModes]; sm[leftSlot] = leftSlot >= 2 ? 'bot' : 'human';
+        const nextCfg = normCfg({ ...curCfg, slotModes: sm, occupied: occ });
+        setCfg(nextCfg);
+        net.setHostCfg(nextCfg);
+        net.send({ type: 'cfg-sync', cfg: nextCfg, occupied: occ, ready: nextReady });
       } else if (msg.type === 'error') {
         setConnecting(false);
         setNetErr(msg.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
@@ -152,30 +145,27 @@ export default function App() {
       } else if (msg.type === 'cfg-slot' || msg.type === 'cfg-p2') {
         const slot = msg.type === 'cfg-p2' ? 1 : (msg.slot ?? 1);
         const p = msg.patch || {};
-        setCfg((cur) => {
-          const repl = (arr, v) => arr.map((x, idx) => (idx === slot && v !== undefined ? v : x));
-          const n = normCfg({
-            ...cur,
-            chars: repl(cur.chars, p.char),
-            colors: repl(cur.colors, p.color),
-            skins: repl(cur.skins, p.skin),
-            loadouts: repl(cur.loadouts, p.loadout),
-            domains: repl(cur.domains, p.domain),
-            teams: repl(cur.teams, p.team),
-          });
-          net.setHostCfg(n);
-          net.send({ type: 'cfg-sync', cfg: n, occupied: n.occupied });
-          return n;
+        const curCfg = cfgRef.current;
+        const repl = (arr, v) => arr.map((x, idx) => (idx === slot && v !== undefined ? v : x));
+        const nextCfg = normCfg({
+          ...curCfg,
+          chars: repl(curCfg.chars, p.char),
+          colors: repl(curCfg.colors, p.color),
+          skins: repl(curCfg.skins, p.skin),
+          loadouts: repl(curCfg.loadouts, p.loadout),
+          domains: repl(curCfg.domains, p.domain),
+          teams: repl(curCfg.teams, p.team),
         });
+        setCfg(nextCfg);
+        net.setHostCfg(nextCfg);
+        net.send({ type: 'cfg-sync', cfg: nextCfg, occupied: nextCfg.occupied });
       } else if (msg.type === 'ready') {
         const slot = msg.slot ?? 1;
-        setNetState((s) => {
-          if (!s) return s;
-          const rdy = [...(s.ready || [true, false, false, false])];
-          rdy[slot] = !!msg.v;
-          if (s.role === 'host') net.send({ type: 'room-meta', occupied: s.occupied, ready: rdy });
-          return { ...s, ready: rdy };
-        });
+        const curNs = netStateRef.current;
+        const rdy = [...(curNs?.ready || [true, false, false, false])];
+        rdy[slot] = !!msg.v;
+        setNetState((s) => (s ? { ...s, ready: rdy } : s));
+        if (curNs?.role === 'host') net.send({ type: 'room-meta', occupied: curNs.occupied, ready: rdy });
       } else if (msg.type === 'start-fight') {
         if (msg.cfg) setCfg(normCfg(msg.cfg));
         setRound((r) => r + 1);
@@ -207,24 +197,24 @@ export default function App() {
   };
 
   const updateCfgOnline = (updater) => {
-    setCfg((prev) => {
-      const next = normCfg(typeof updater === 'function' ? updater(prev) : updater);
-      if (netState?.role === 'host') {
-        netRef.current.setHostCfg(next);
-        netRef.current.send({ type: 'cfg-sync', cfg: next, occupied: netState.occupied, ready: netState.ready });
-      } else if (netState?.role === 'guest') {
-        const s = netState.mySlot ?? 1;
-        netRef.current.send({
-          type: 'cfg-slot',
-          slot: s,
-          patch: {
-            char: next.chars[s], color: next.colors[s], skin: next.skins[s],
-            loadout: next.loadouts[s], domain: next.domains[s], team: next.teams[s],
-          },
-        });
-      }
-      return next;
-    });
+    const next = normCfg(typeof updater === 'function' ? updater(cfgRef.current) : updater);
+    cfgRef.current = next;
+    setCfg(next);
+    const curNs = netStateRef.current;
+    if (curNs?.role === 'host') {
+      netRef.current.setHostCfg(next);
+      netRef.current.send({ type: 'cfg-sync', cfg: next, occupied: curNs.occupied, ready: curNs.ready });
+    } else if (curNs?.role === 'guest') {
+      const s = curNs.mySlot ?? 1;
+      netRef.current.send({
+        type: 'cfg-slot',
+        slot: s,
+        patch: {
+          char: next.chars[s], color: next.colors[s], skin: next.skins[s],
+          loadout: next.loadouts[s], domain: next.domains[s], team: next.teams[s],
+        },
+      });
+    }
   };
 
   const createRoom = async (mode = 'p2p') => {
@@ -254,7 +244,7 @@ export default function App() {
   const copyInvite = async () => {
     if (!netState) return;
     const isLocal = /^(localhost|127\.0\.0\.1|192\.168\.|10\.|26\.)/.test(location.hostname);
-    const base = isLocal && (netState.mode || 'p2p') === 'p2p'
+    const base = isLocal && (netState.mode || 'p2p') !== 'ws'
       ? 'https://poom24-afk.github.io/stickman-battle-arena/'
       : `${location.origin}${location.pathname}`;
     const url = `${base}?room=${netState.code}&mode=${netState.mode || 'p2p'}`;
