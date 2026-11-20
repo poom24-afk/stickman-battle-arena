@@ -20,7 +20,9 @@ export class NetClient {
     this.ws = null;
     this.peer = null;
     this.conn = null;
-    this.conns = new Map(); // Host: slot (1..3) -> conn
+    this.fastConn = null;
+    this.conns = new Map(); // Host: slot (1..3) -> reliable conn
+    this.fastConns = new Map(); // Host: slot (1..3) -> unreliable fast conn
     this.hostCfg = null;
     this.role = null;
     this.mySlot = 0;
@@ -139,6 +141,19 @@ export class NetClient {
       });
 
       peer.on('connection', (conn) => {
+        const meta = conn.metadata || {};
+        if (meta.ch === 'fast') {
+          const s = Number(meta.slot);
+          if (s >= 1 && s <= 3 && this.conns.has(s)) {
+            this.fastConns.set(s, conn);
+            conn.on('data', (data) => this.handleIncoming(data, s, conn));
+            conn.on('close', () => { if (this.fastConns.get(s) === conn) this.fastConns.delete(s); });
+            conn.on('error', () => { if (this.fastConns.get(s) === conn) this.fastConns.delete(s); });
+          } else {
+            conn.on('open', () => { try { conn.close(); } catch { /* ignore */ } });
+          }
+          return;
+        }
         const curCfg = this.hostCfg || cfg;
         const candidates = curCfg?.mode === '2v2' ? [1, 2, 3] : [1];
         const freeSlot = candidates.find((s) => !this.conns.has(s) || !this.conns.get(s).open);
@@ -158,6 +173,7 @@ export class NetClient {
           readyFired = true;
           const occ = this.getOccupied();
           conn.send({ type: 'welcome', code: this.code, mode: 'p2p', slot: freeSlot, cfg: this.hostCfg || cfg, occupied: occ });
+          if (!this.pingTimer) this.startPing();
           this.emit({ type: 'peer-joined', slot: freeSlot, occupied: occ });
         };
         if (conn.open) onReady(); else conn.on('open', onReady);
@@ -168,6 +184,9 @@ export class NetClient {
         conn.on('close', () => {
           if (this.conns.get(freeSlot) === conn) {
             this.conns.delete(freeSlot);
+            const fc = this.fastConns.get(freeSlot);
+            if (fc) { this.fastConns.delete(freeSlot); try { fc.close(); } catch { /* ignore */ } }
+            if (this.conns.size === 0) clearInterval(this.pingTimer);
             this.emit({ type: 'peer-left', slot: freeSlot, occupied: this.getOccupied(), reason: `ผู้เล่น P${freeSlot + 1} ออกจากห้องแล้ว` });
           }
         });
@@ -200,7 +219,7 @@ export class NetClient {
       }, 20000);
 
       peer.on('open', () => {
-        const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
+        const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json', metadata: { ch: 'rel' } });
         this.conn = conn;
         conn.on('data', (data) => {
           if (data?.type === 'error') {
@@ -214,6 +233,11 @@ export class NetClient {
             this.role = 'guest';
             this.mySlot = data.slot ?? 1;
             this.code = code;
+            const fc = peer.connect(PREFIX + code, { reliable: false, serialization: 'json', metadata: { ch: 'fast', slot: this.mySlot } });
+            this.fastConn = fc;
+            fc.on('data', (d) => this.handleIncoming(d));
+            fc.on('close', () => { if (this.fastConn === fc) this.fastConn = null; });
+            fc.on('error', () => { if (this.fastConn === fc) this.fastConn = null; });
             this.startPing();
             this.emit({ type: 'joined', code, mode: 'p2p', slot: this.mySlot, cfg: data.cfg, occupied: data.occupied });
             resolve();
@@ -265,18 +289,50 @@ export class NetClient {
     }
   }
 
+  /* ส่งแพ็กเก็ตเรียลไทม์ (state / movement) ผ่านช่อง Unreliable เพื่อลดอาการค้างรอแพ็กเก็ตและตัด bufferbloat */
+  sendFast(obj, targetSlot = null) {
+    const canPush = (c) => c && c.open && ((c.dataChannel?.bufferedAmount || 0) < 49152);
+    if (this.mode === 'ws') {
+      if (this.ws && this.ws.readyState === 1 && this.ws.bufferedAmount < 49152) this.ws.send(JSON.stringify(obj));
+    } else if (this.role === 'host') {
+      if (targetSlot !== null) {
+        const c = this.fastConns.get(targetSlot) || this.conns.get(targetSlot);
+        if (canPush(c)) c.send(obj);
+      } else {
+        this.conns.forEach((rel, s) => {
+          const fc = this.fastConns.get(s);
+          const ch = fc && fc.open ? fc : rel;
+          if (canPush(ch)) ch.send(obj);
+        });
+      }
+    } else {
+      const ch = this.fastConn && this.fastConn.open ? this.fastConn : this.conn;
+      if (canPush(ch)) ch.send(obj);
+    }
+  }
+
   close() {
     clearInterval(this.pingTimer);
+    this.pingTimer = null;
     if (this.ws) {
       const w = this.ws;
       this.ws = null;
       try { if (w.readyState === 1) w.send(JSON.stringify({ type: 'leave' })); } catch { /* ignore */ }
       try { w.close(); } catch { /* ignore */ }
     }
+    if (this.fastConn) {
+      const fc = this.fastConn;
+      this.fastConn = null;
+      try { fc.close(); } catch { /* ignore */ }
+    }
     if (this.conn) {
       const c = this.conn;
       this.conn = null;
       try { c.close(); } catch { /* ignore */ }
+    }
+    if (this.fastConns.size) {
+      this.fastConns.forEach((c) => { try { c.close(); } catch { /* ignore */ } });
+      this.fastConns.clear();
     }
     if (this.conns.size) {
       this.conns.forEach((c) => { try { c.close(); } catch { /* ignore */ } });

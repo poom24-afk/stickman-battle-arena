@@ -84,6 +84,7 @@ export class Game {
     const rawHints = keyHints(this.controls);
     this.hints = Array.from({ length: 4 }, (_, i) => (this.net ? rawHints[0] : (rawHints[i] || rawHints[0])));
     this.netEvents = []; this.remoteHeld = [{}, {}, {}, {}]; this.remotePulse = [{}, {}, {}, {}]; this.lastSync = 0; this.lastSentHeld = ''; this._lastShake = 0;
+    this.netSeq = 0; this.lastStateSeq = 0; this.lastInputSeq = [0, 0, 0, 0]; this.inputSeq = 0; this.remoteFreeze = false; this._lastSentRound = 0; this._lastSentPhase = '';
     this.sfx = this.netRole === 'host'
       ? Object.fromEntries(Object.keys(rawSfx).map((k) => [k, () => { rawSfx[k](); this.netEvents.push(['sfx', k]); }]))
       : rawSfx;
@@ -142,11 +143,17 @@ export class Game {
       if (this.netRole === 'host' && msg.type === 'input') {
         const s = msg.slot ?? 1;
         if (s >= 1 && s < 4) {
-          this.remoteHeld[s] = msg.held || {};
+          const seq = msg.seq || 0;
+          if (!seq || seq > this.lastInputSeq[s]) {
+            if (seq) this.lastInputSeq[s] = seq;
+            this.remoteHeld[s] = msg.held || {};
+          }
           if (msg.pulse) for (const k in msg.pulse) if (msg.pulse[k]) this.remotePulse[s][k] = true;
         }
       } else if (this.netRole === 'guest' && msg.type === 'state') {
         this.applySnapshot(msg);
+      } else if (this.netRole === 'guest' && msg.type === 'ev') {
+        this.applyEvents(msg.ev);
       } else if (msg.type === 'pause') {
         if (!this.over) { this.paused = !!msg.v; this.keys.clear(); this.cb.onPause?.(this.paused); }
       } else if (msg.type === 'peer-left' || msg.type === 'closed') {
@@ -166,7 +173,7 @@ export class Game {
   fitCanvas() {
     const r = this.cv.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const cw = Math.round(r.width * dpr), ch = Math.round(r.height * dpr);
     if (this.cv.width !== cw || this.cv.height !== ch) {
       this.cv.width = cw; this.cv.height = ch;
@@ -178,6 +185,10 @@ export class Game {
     this.fitCanvas();
     this.onResize = () => this.fitCanvas();
     addEventListener('resize', this.onResize);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.ro = new ResizeObserver(this.onResize);
+      this.ro.observe(this.cv);
+    }
     addEventListener('keydown', this.onKeyDown); addEventListener('keyup', this.onKeyUp);
     addEventListener('blur', this.clearKeys); document.addEventListener('visibilitychange', this.onVis);
     this.last = performance.now();
@@ -191,6 +202,7 @@ export class Game {
   destroy() {
     cancelAnimationFrame(this.raf);
     this.unsubNet?.();
+    if (this.ro) { this.ro.disconnect(); this.ro = null; }
     if (this.onResize) removeEventListener('resize', this.onResize);
     removeEventListener('keydown', this.onKeyDown); removeEventListener('keyup', this.onKeyUp);
     removeEventListener('blur', this.clearKeys); document.removeEventListener('visibilitychange', this.onVis);
@@ -203,7 +215,7 @@ export class Game {
       const n = tIdx[f.team]++;
       const sx = f.team === 0 ? (spA[n] ?? 480) : (spB[n] ?? 1920);
       Object.assign(f, {
-        x: sx, y: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
+        x: sx, y: GROUND, _tx: sx, _ty: GROUND, vx: 0, vy: 0, face: f.team ? -1 : 1, hp: 100, hpShow: 100, act: null, stun: 0, inv: 0, blocking: false,
         parryT: 0, parryCd: 0, dropT: 0, dropCool: 0, climbing: false, floorY: GROUND, ragdollT: 0, ledge: null, ledgeCd: 0,
         aiAtkT: rnd(0.2, 0.5), aiJumpT: 0, mahoraga: 0, adapt: {}, adaptSpin: 0, qte: null, qteMul: 1,
         cd: [0, 0, 0], amp: 0, ampMul: 1, ampSpd: 1, ce: f.ce > 0 && this.round > 1 ? Math.min(60, f.ce) : 0, combo: 0, comboT: 0, flash: 0, anim: 0, grounded: true, ghost: false, ko: false, rag: 0, aura: 0, auraC: '#fff',
@@ -390,10 +402,10 @@ export class Game {
     const sig = JSON.stringify(held);
     if (sig !== this.lastSentHeld || hasPulse) {
       this.lastSentHeld = sig;
-      this.net.send({ type: 'input', slot: this.mySlot, held, pulse });
+      this.net.send({ type: 'input', slot: this.mySlot, seq: ++this.inputSeq, held, pulse });
     }
   }
-  sendSnapshot() {
+  collectEvents() {
     const collect = (arr, name) => {
       for (const item of arr) {
         if (!item._s) {
@@ -408,30 +420,70 @@ export class Game {
     if (this.flash && !this.flash._s) { this.flash._s = true; this.netEvents.push(['flash', { t: this.flash.t, max: this.flash.max, c: this.flash.c }]); }
     if (this.shake > 2 && this.shake > this._lastShake + 1.5) this.netEvents.push(['shake', this.shake]);
     this._lastShake = this.shake;
-    this.net.send({
+  }
+  flushNetEvents() {
+    this.collectEvents();
+    if (this.netEvents.length > 0) this.net.send({ type: 'ev', ev: this.netEvents.splice(0) });
+  }
+  syncNet() {
+    this.flushNetEvents();
+    const crucial = this.round !== this._lastSentRound || this.phase !== this._lastSentPhase || this.matchWinner !== null;
+    if (crucial || this.time - this.lastSync >= 0.025) {
+      this.lastSync = this.time;
+      this.sendSnapshot(crucial);
+    }
+  }
+  sendSnapshot(reliable = false) {
+    this._lastSentRound = this.round;
+    this._lastSentPhase = this.phase;
+    const snap = {
       type: 'state',
-      round: this.round, phase: this.phase, phaseT: this.phaseT, cnt: this.cnt, timer: this.timer,
-      banner: this.banner, label: this.label, msg: this.msg, matchWinner: this.matchWinner, wins: this.wins, victory: this.victory,
+      seq: ++this.netSeq,
+      round: this.round, phase: this.phase, phaseT: Math.round(this.phaseT * 100) / 100, cnt: this.cnt, timer: Math.round(this.timer * 10) / 10,
+      banner: Math.round(this.banner * 100) / 100, label: this.label, msg: this.msg, matchWinner: this.matchWinner, wins: this.wins,
+      freeze: this.freeze > 0 ? 1 : 0,
       fighters: this.fighters.map((f) => ({
         x: Math.round(f.x * 10) / 10, y: Math.round(f.y * 10) / 10, vx: Math.round(f.vx), vy: Math.round(f.vy),
         face: f.face, hp: Math.round(f.hp * 10) / 10, ce: Math.round(f.ce * 10) / 10,
         cd: f.cd.map((v) => Math.round(v * 10) / 10), amp: Math.round(f.amp * 10) / 10, ampMul: f.ampMul, ampSpd: f.ampSpd,
-        aura: Math.round(f.aura * 10) / 10, auraC: f.auraC, combo: f.combo, comboT: f.comboT,
+        aura: Math.round(f.aura * 10) / 10, auraC: f.auraC, combo: f.combo, comboT: Math.round(f.comboT * 100) / 100,
         stun: Math.round(f.stun * 100) / 100, inv: Math.round(f.inv * 100) / 100, flash: Math.round(f.flash * 100) / 100,
         blocking: f.blocking, parryT: Math.round(f.parryT * 100) / 100, climbing: f.climbing,
         ragdollT: Math.round(f.ragdollT * 100) / 100, ko: f.ko, grounded: f.grounded, ghost: f.ghost,
-        wins: f.wins, anim: f.anim, act: f.act, ledge: f.ledge, ai: f.ai, tag: f.tag,
+        wins: f.wins, anim: Math.round(f.anim * 100) / 100, act: f.act, ledge: f.ledge, ai: f.ai, tag: f.tag,
         mahoraga: Math.round((f.mahoraga || 0) * 10) / 10, adaptSpin: Math.round((f.adaptSpin || 0) * 100) / 100,
         qte: f.qte, adaptN: Object.keys(f.adapt || {}).length,
       })),
-      proj: this.proj, orbs: this.orbs, beams: this.beams, warns: this.warns,
-      dom: this.dom ? { ...this.dom, ticks: undefined } : null,
-      cutscene: this.cutscene ? { owner: this.cutscene.owner, target: this.cutscene.target, name: this.cutscene.name, t: this.cutscene.t, dur: this.cutscene.dur, step: this.cutscene.step, qte: this.cutscene.qte } : null,
-      ev: this.netEvents.splice(0),
+    };
+    if (this.victory) snap.victory = this.victory;
+    if (this.proj.length) snap.proj = this.proj;
+    if (this.orbs.length) snap.orbs = this.orbs;
+    if (this.beams.length) snap.beams = this.beams;
+    if (this.warns.length) snap.warns = this.warns;
+    if (this.dom) snap.dom = { ...this.dom, ticks: undefined };
+    if (this.cutscene) snap.cutscene = { owner: this.cutscene.owner, target: this.cutscene.target, name: this.cutscene.name, t: this.cutscene.t, dur: this.cutscene.dur, step: this.cutscene.step, qte: this.cutscene.qte };
+    if (reliable) this.net.send(snap);
+    else this.net.sendFast(snap);
+  }
+  applyEvents(ev) {
+    if (!ev || !ev.length) return;
+    ev.forEach((item) => {
+      const [kind, a1, a2, a3, a4, a5, a6, a7, a8] = item;
+      if (kind === 'sfx') rawSfx[a1]?.();
+      else if (kind === 'spark') this.spark(a1, a2, a3, a4, a5, a6, a7, a8);
+      else if (kind === 'flash') this.flash = a1;
+      else if (kind === 'shake') this.shake = Math.max(this.shake, a1);
+      else if (kind === 'fx') this[a1]?.push(a2);
+      else if (kind === 'after') this.pushAfter(this.fighters[a1], a2);
     });
   }
   applySnapshot(s) {
-    if (s.round !== this.round) {
+    if (s.seq) {
+      if (s.seq <= this.lastStateSeq) return;
+      this.lastStateSeq = s.seq;
+    }
+    const roundChanged = s.round !== this.round;
+    if (roundChanged) {
       this.round = s.round;
       this.parts = []; this.proj = []; this.rings = []; this.beams = []; this.slashes = []; this.arcs = [];
       this.orbs = []; this.zaps = []; this.pillars = []; this.texts = []; this.afters = []; this.warns = []; this.flash = null;
@@ -439,12 +491,15 @@ export class Game {
     this.phase = s.phase; this.phaseT = s.phaseT; this.cnt = s.cnt; this.timer = s.timer;
     this.banner = s.banner; this.label = s.label; this.msg = s.msg; this.matchWinner = s.matchWinner;
     this.victory = s.victory || null;
+    this.remoteFreeze = !!s.freeze;
     if (s.wins) this.wins = s.wins;
     s.fighters.forEach((sf, i) => {
       const f = this.fighters[i];
       if (!f) return;
-      if (Math.abs(sf.x - f.x) > 85 || Math.abs(sf.y - f.y) > 85) { f.x = sf.x; f.y = sf.y; }
-      else { f.x += (sf.x - f.x) * 0.65; f.y += (sf.y - f.y) * 0.65; }
+      f._tx = sf.x; f._ty = sf.y;
+      if (roundChanged || !Number.isFinite(f.x) || Math.hypot(sf.x - f.x, sf.y - f.y) > 140) {
+        f.x = sf.x; f.y = sf.y;
+      }
       Object.assign(f, {
         vx: sf.vx, vy: sf.vy, face: sf.face, hp: sf.hp, ce: sf.ce, cd: sf.cd, amp: sf.amp, ampMul: sf.ampMul, ampSpd: sf.ampSpd,
         aura: sf.aura, auraC: sf.auraC, combo: sf.combo, comboT: sf.comboT, stun: sf.stun, inv: sf.inv, flash: sf.flash,
@@ -456,15 +511,7 @@ export class Game {
     this.proj = s.proj || []; this.orbs = s.orbs || []; this.beams = s.beams || []; this.warns = s.warns || [];
     this.dom = s.dom || null;
     this.cutscene = s.cutscene ? { ...s.cutscene, sp: spec(s.cutscene.name) } : null;
-    (s.ev || []).forEach((ev) => {
-      const [kind, a1, a2, a3, a4, a5, a6, a7, a8] = ev;
-      if (kind === 'sfx') rawSfx[a1]?.();
-      else if (kind === 'spark') this.spark(a1, a2, a3, a4, a5, a6, a7, a8);
-      else if (kind === 'flash') this.flash = a1;
-      else if (kind === 'shake') this.shake = Math.max(this.shake, a1);
-      else if (kind === 'fx') this[a1]?.push(a2);
-      else if (kind === 'after') this.pushAfter(this.fighters[a1], a2);
-    });
+    if (s.ev) this.applyEvents(s.ev);
     if (this.matchWinner !== null && !this.reported) {
       this.reported = true; this.over = true;
       this.cb.onEnd?.({ winner: this.matchWinner, scores: [...this.wins] });
@@ -492,17 +539,39 @@ export class Game {
     if (this.netRole === 'guest') {
       this.sendGuestInput();
       if (this.paused) return;
-      this.time += dt; this.shake = Math.max(0, this.shake - dt * 40); this.banner = Math.max(0, this.banner - dt);
+      this.time += dt; this.shake = Math.max(0, this.shake - dt * 40);
+      if (this.remoteFreeze) { this.updateCamera(dt); return; }
+      this.banner = Math.max(0, this.banner - dt);
       if (this.victory) this.victory.t += dt;
-      this.proj.forEach((p) => { p.x += p.vx * dt; });
-      this.fighters.forEach((f) => { if (!f.ledge && !this.cutscene) f.x = clamp(f.x + f.vx * dt, -250, this.worldW + 250); });
+      this.proj.forEach((p) => { p.x += p.vx * dt; if (p.vy) p.y += p.vy * dt; });
+      this.orbs.forEach((o) => { o.x += (o.vx || 0) * dt; o.y += (o.vy || 0) * dt; });
+      const blend = 1 - Math.exp(-18 * dt);
+      this.fighters.forEach((f) => {
+        if (!f.ledge && !this.cutscene) {
+          if (!f.grounded && !f.climbing && !f.ko && (!f.act || f.act.name !== 'domain')) f.vy += 2200 * dt;
+          const prevY = f.y;
+          f.x = clamp(f.x + f.vx * dt, -250, this.worldW + 250);
+          f.y = Math.min(H + 300, f.y + f.vy * dt);
+          if (f._tx !== undefined) {
+            f._tx = clamp(f._tx + f.vx * dt, -250, this.worldW + 250);
+            f._ty = Math.min(H + 300, f._ty + f.vy * dt);
+            f.x += (f._tx - f.x) * blend;
+            f.y += (f._ty - f.y) * blend;
+          }
+          if (f.vy >= 0 && f.x > this.stageL && f.x < this.stageR && prevY <= GROUND + 8 && f.y > GROUND) {
+            f.y = GROUND; f.vy = 0; f.grounded = true;
+            if (f._ty > GROUND) f._ty = GROUND;
+          }
+          if (Math.abs(f.vx) > 20 && f.grounded) f.anim += dt;
+        }
+      });
       this.stepFx(dt);
       this.updateCamera(dt);
       return;
     }
     if (this.paused) return;
     this.time += dt; this.shake = Math.max(0, this.shake - dt * 40);
-    if (this.freeze > 0) { this.freeze -= dt; this.updateCamera(dt); return; }
+    if (this.freeze > 0) { this.freeze -= dt; this.updateCamera(dt); if (this.netRole === 'host') this.syncNet(); return; }
     this.banner = Math.max(0, this.banner - dt); this.phaseT -= dt;
     if (this.phase === 'countdown') {
       const n = Math.ceil(this.phaseT);
@@ -585,10 +654,7 @@ export class Game {
       else if (d0) this.endRound(1, 'K.O.');
       else if (d1) this.endRound(0, 'K.O.');
     }
-    if (this.netRole === 'host' && (this.time - this.lastSync >= 0.025 || this.netEvents.length > 0)) {
-      this.lastSync = this.time;
-      this.sendSnapshot();
-    }
+    if (this.netRole === 'host') this.syncNet();
   }
   endRound(w, label) {
     this.phase = 'ko'; this.phaseT = w >= 0 ? 3.2 : 2.4; this.label = label; this.dom = null; this.cutscene = null;
@@ -1458,6 +1524,7 @@ export class Game {
   spark(x, y, n, color, spd, life, size, g = 600) {
     if (this.netRole === 'host') this.netEvents.push(['spark', x, y, n, color, spd, life, size, g]);
     for (let i = 0; i < n; i++) { const an = rnd(0, Math.PI * 2), s = rnd(0.2, 1) * spd; this.parts.push({ x, y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, life: rnd(0.5, 1) * life, max: life, color, size: rnd(0.5, 1) * size, g }); }
+    if (this.parts.length > 220) this.parts.splice(0, this.parts.length - 220);
   }
   ring(x, y, r, color) { this.rings.push({ x, y, r, t: 0.35, max: 0.35, color }); }
   dust(f) { this.spark(f.x, f.y, 8, '#cfd8dc', 160, 0.4, 5, 50); }
@@ -1557,7 +1624,6 @@ export class Game {
   }
   /* ---------------- RENDER ---------------- */
   render() {
-    this.fitCanvas();
     const c = this.c, cw = this.cv.width || W, ch = this.cv.height || H, s = this.shake;
     const sc = Math.min(cw / W, ch / H), ox = (cw - W * sc) / 2, oy = (ch - H * sc) / 2;
     this.vx0 = -ox / sc - 6; this.vx1 = this.vx0 + cw / sc + 12; this.vw = cw / sc + 12;
