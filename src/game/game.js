@@ -2062,7 +2062,7 @@ export class Game {
       return { lean: 0, crouch: 4, hF: [26, -18], hB: [24, -16], fF: [18, 0], fB: [-18, 0] };
     }
     else if (a) {
-      const sp = spec(a.name), k = clamp(a.t / sp.dur, 0, 1), e = Math.sin(k * Math.PI);
+      const sp = spec(a.name) || { pose: a.name, dur: 0.35 }, k = clamp(a.t / (sp.dur || 0.35), 0, 1), e = Math.sin(k * Math.PI);
       switch (sp.pose) {
         case 'punch':
           if (k < 0.25) { P = { lean: -6, crouch: 4, hF: [-14, 6], hB: [22, -8], fF: [18, 0], fB: [-18, 0] }; }
