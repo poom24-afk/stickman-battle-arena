@@ -836,8 +836,9 @@ export class Game {
     if (f.climbing) {
       const cl2 = climbs.find((clm) => Math.abs(f.x - clm.x) < 26 && f.y >= clm.y1 - 4 && f.y <= clm.y2 + 12);
       if (!cl2) f.climbing = false;
-      else if (f.y <= cl2.y1 && inp._jump) { f.y = cl2.y1; f.vy = 0; f.grounded = true; f.climbing = false; }
-      else if (f.y >= GROUND && f.x > this.stageL && f.x < this.stageR && !inp._block) { f.y = GROUND; f.vy = 0; f.grounded = true; f.climbing = false; }
+      else if (f.y <= cl2.y1 && inp._jump) { f.y = cl2.y1; f.vy = 0; f.grounded = true; f.climbing = false; f.dropT = 0; }
+      else if (f.y >= GROUND && f.x > this.stageL && f.x < this.stageR) { f.y = GROUND; f.vy = 0; f.grounded = true; f.climbing = false; f.dropT = 0; }
+      else if (f.y >= cl2.y2) { f.y = cl2.y2; f.vy = 0; f.dropT = 0; }
       return;
     }
 
