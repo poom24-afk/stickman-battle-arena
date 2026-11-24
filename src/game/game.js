@@ -49,25 +49,25 @@ const WIN_QUOTES = {
   geto: 'วิญญาณคำสาปทั้งหมด จงสยบแทบเท้าข้า',
 };
 const FINISHERS = {
-  gojo: { jp: '虚式・茈', title: 'HOLLOW PURPLE · UNLIMITED', style: 'gojo', color: '#d500f9' },
-  sukuna: { jp: '世界を断つ斬撃', title: 'WORLD CUTTING SLASH', style: 'sukuna', color: '#ff2d55' },
+  gojo: { jp: '虚式・茈', title: 'HOLLOW PURPLE · UNLIMITED', style: 'gojo', color: '#d500f9', range: 580 },
+  sukuna: { jp: '世界を断つ斬撃', title: 'WORLD CUTTING SLASH', style: 'sukuna', color: '#ff2d55', range: 580 },
   yuji: { jp: '黒閃・極', title: 'CONSECUTIVE BLACK FLASH', style: 'yuji', color: '#ff1744' },
-  megumi: { jp: '嵌合暗翳庭', title: 'CHIMERA SHADOW ABYSS', style: 'megumi', color: '#c46bff' },
+  megumi: { jp: '嵌合暗翳庭', title: 'CHIMERA SHADOW ABYSS', style: 'megumi', color: '#c46bff', range: 580 },
   mahoraga: { jp: '八握剣・魔虚羅', title: 'DIVINE WHEEL OBLITERATION', style: 'mahoraga', color: '#ffd54f' },
-  nobara: { jp: '芻霊呪法・共鳴り', title: 'STRAW DOLL RESONANCE', style: 'nobara', color: '#ff6bd6' },
+  nobara: { jp: '芻霊呪法・共鳴り', title: 'STRAW DOLL RESONANCE', style: 'nobara', color: '#ff6bd6', range: 580 },
   nanami: { jp: '十劃呪法・７：３', title: 'OVERTIME RATIO 7:3', style: 'nanami', color: '#ffd24a' },
   maki: { jp: '呪具・游雲', title: 'PLAYFUL CLOUD TYPHOON', style: 'maki', color: '#7dff6b' },
   toji: { jp: '天逆鉾・鎖万里', title: 'INVERTED SPEAR EXECUTION', style: 'toji', color: '#ffffff' },
-  toge: { jp: '呪言・爆ぜろ', title: 'CURSED SPEECH: EXPLODE', style: 'toge', color: '#3dd6ff' },
+  toge: { jp: '呪言・爆ぜろ', title: 'CURSED SPEECH: EXPLODE', style: 'toge', color: '#3dd6ff', range: 580 },
   todo: { jp: '不義遊戯・黒閃', title: 'BOOGIE WOOGIE BLACK FLASH', style: 'todo', color: '#ff8a3d' },
-  yuta: { jp: '純愛・リカ顕現', title: 'RIKA · PURE LOVE BEAM', style: 'yuta', color: '#ff80ab' },
+  yuta: { jp: '純愛・リカ顕現', title: 'RIKA · PURE LOVE BEAM', style: 'yuta', color: '#ff80ab', range: 580 },
   mahito: { jp: '無為転変・魂砕', title: 'IDLE SOUL CRUSH', style: 'mahito', color: '#7dff6b' },
-  jogo: { jp: '極ノ番・隕', title: 'MAXIMUM METEOR ERUPTION', style: 'jogo', color: '#ff6d00' },
+  jogo: { jp: '極ノ番・隕', title: 'MAXIMUM METEOR ERUPTION', style: 'jogo', color: '#ff6d00', range: 580 },
   hakari: { jp: '坐殺博徒・７７７', title: '777 JACKPOT BARRAGE', style: 'hakari', color: '#ffd24a' },
-  choso: { jp: '穿血・超新星', title: 'CONVERGENCE SUPERNOVA', style: 'choso', color: '#ff1744' },
+  choso: { jp: '穿血・超新星', title: 'CONVERGENCE SUPERNOVA', style: 'choso', color: '#ff1744', range: 580 },
   higuruma: { jp: '処刑人の剣', title: 'EXECUTIONER SWORD', style: 'higuruma', color: '#ffd24a' },
-  dagon: { jp: '死累累湧軍', title: 'ABYSSAL SHARK SWARM', style: 'dagon', color: '#3dd6ff' },
-  geto: { jp: '極ノ番・うずまき', title: 'MAXIMUM: UZUMAKI', style: 'geto', color: '#c46bff' },
+  dagon: { jp: '死累累湧軍', title: 'ABYSSAL SHARK SWARM', style: 'dagon', color: '#3dd6ff', range: 580 },
+  geto: { jp: '極ノ番・うずまき', title: 'MAXIMUM: UZUMAKI', style: 'geto', color: '#c46bff', range: 580 },
 };
 const NAMES = ['head', 'neck', 'hip', 'kF', 'kB', 'fF', 'fB', 'eF', 'eB', 'hF', 'hB'];
 const BONES = [['neck', 'head', 17], ['neck', 'hip', 40], ['hip', 'kF', 32], ['kF', 'fF', 32], ['hip', 'kB', 32], ['kB', 'fB', 32],
@@ -314,7 +314,7 @@ export class Game {
     if (this.finisher) {
       const ff = this.fighters[this.finisher.owner], fo = this.fighters[this.finisher.target];
       if (ff && fo) {
-        const tz = 1.32;
+        const tz = clamp(W / (Math.abs(ff.x - fo.x) + 340), 0.72, 1.32);
         const cx = clamp((ff.x + fo.x) / 2, W / (2 * tz) - 40, Math.max(W / (2 * tz) - 40, this.worldW - W / (2 * tz) + 40));
         const cy = clamp((ff.y + fo.y) / 2 - 75, H / (2 * tz) - 20, H + 40 - H / (2 * tz));
         const k = Math.min(1, dt * 8);
@@ -777,9 +777,19 @@ export class Game {
     this.msg = w >= 0 ? `${this.is2v2 ? `TEAM ${w ? 'B' : 'A'}` : `PLAYER ${w + 1}`} WINS ROUND ${this.round}` : 'DRAW - REPLAY';
     this.shake = 18; this.freeze = 0.14; this.sfx.ko();
   }
+  finisherDef(f) {
+    if (!f) return null;
+    const key = f.mahoraga > 0 ? 'mahoraga' : f.chId;
+    return FINISHERS[key] || { jp: '終極奥義', title: 'ULTIMATE FINISHER', style: 'yuji', color: f.color };
+  }
+  finisherRange(f) {
+    const def = this.finisherDef(f);
+    return def?.range ? { rx: def.range, ry: 220, isRanged: true } : { rx: 95, ry: 95, isRanged: false };
+  }
   finishTarget(f) {
     if (!f || f.ko || f.dizzy > 0) return null;
-    const list = this.fighters.filter((e) => e.team !== f.team && !e.ko && e.dizzy > 0 && Math.abs(e.x - f.x) <= 95 && Math.abs(e.y - f.y) <= 95);
+    const r = this.finisherRange(f);
+    const list = this.fighters.filter((e) => e.team !== f.team && !e.ko && e.dizzy > 0 && Math.abs(e.x - f.x) <= r.rx && Math.abs(e.y - f.y) <= r.ry);
     if (!list.length) return null;
     list.sort((a, b) => Math.abs(a.x - f.x) - Math.abs(b.x - f.x));
     return list[0];
@@ -1195,7 +1205,7 @@ export class Game {
     } else if (sp.kind === 'jackpot') {
       this.sfx.jackpot(); this.ring(f.x, f.y - 80, 140, col);
       if (Math.random() < 0.3) {
-        f.hp = Math.min(100, f.hp + 25); f.inv = Math.max(f.inv, 2.5); f.aura = 2.5; f.auraC = col; this.spark(f.x, f.y - 80, 40, col, 500, 0.8, 7, 200);
+        f.hp = Math.min(100, f.hp + 22); f.inv = Math.max(f.inv, 2.2); f.aura = 2.2; f.auraC = col; this.spark(f.x, f.y - 80, 40, col, 500, 0.8, 7, 200);
         this.texts.push({ txt: '777 JACKPOT!', x: f.x, y: f.y - 170, t: 1.2, max: 1.2, color: col, size: 46 });
       } else { f.ce = Math.min(100, f.ce + 35); this.texts.push({ txt: 'CE +35', x: f.x, y: f.y - 170, t: 0.9, max: 0.9, color: col, size: 34 }); }
     } else if (sp.kind === 'strike') {
@@ -1283,7 +1293,7 @@ export class Game {
         for (let i = 0; i < 4; i++) this.zaps.push({ x: o.x, y: o.y - 80, t: 0.25, color: i % 2 ? sp.color : '#111' });
         this.ring(o.x, o.y - 80, 140 + k * 35, sp.color);
         this.texts.push({ txt: sp.cut === 'gamble' ? ['7', '7', '7'][k] : `黒閃 ${k + 1}!`, x: o.x + rnd(-50, 50), y: o.y - 160 - k * 14, t: 0.65, max: 0.65, color: sp.color, size: 36 });
-        if (sp.cut === 'gamble' && k === 2) { f.hp = Math.min(100, f.hp + 12); this.texts.push({ txt: '+12 HP JACKPOT!', x: f.x, y: f.y - 160, t: 0.9, max: 0.9, color: '#ffd24a', size: 32 }); this.sfx.jackpot(); }
+        if (sp.cut === 'gamble' && k === 2) { f.hp = Math.min(100, f.hp + 10); this.texts.push({ txt: '+10 HP JACKPOT!', x: f.x, y: f.y - 160, t: 0.9, max: 0.9, color: '#ffd24a', size: 32 }); this.sfx.jackpot(); }
         else this.sfx.bf();
         this.shake = 16; this.freeze = 0.07;
       } else if (sp.cut === 'bisect' || sp.cut === 'mahoraga') {
@@ -1401,8 +1411,8 @@ export class Game {
   /* ---------------- SIGNATURE FINISHER ATTACK (19 ท่าปิดฉากเฉพาะตัวละคร ไม่ซ้ำกัน!) ---------------- */
   startFinisher(f, o, winTeam) {
     if (!f || !o) { this.endRound(winTeam, 'K.O.'); return; }
-    const key = f.mahoraga > 0 ? 'mahoraga' : f.chId;
-    const def = FINISHERS[key] || { jp: '終極奥義', title: 'ULTIMATE FINISHER', style: 'yuji', color: f.color };
+    const def = this.finisherDef(f);
+    const maxDist = def.range || 220;
     const continueFight = this.fighters.some((m) => m.team !== winTeam && m !== o && !m.ko && (m.hp > 0 || m.dizzy > 0) && m.y <= H + 100);
     this.dom = null; this.cutscene = null;
     this.proj = []; this.orbs = []; this.beams = []; this.warns = [];
@@ -1415,8 +1425,10 @@ export class Game {
     o.hp = 0; o.dizzy = 0;
     o.vx = 0; o.vy = 0; o.ko = false; o.ragdollT = 0; o.stun = 3.2; o.act = null; o.ledge = null; o.climbing = false; o.inv = 0;
     const dir = o.x >= f.x ? 1 : -1;
-    if (Math.abs(o.x - f.x) > 220 || f.y > GROUND + 20) f.x = clamp(o.x - dir * 130, this.stageL + 40, this.stageR - 40);
-    f.y = o.y; f.grounded = o.grounded; f.face = o.x >= f.x ? 1 : -1;
+    if (Math.abs(o.x - f.x) > maxDist || f.y > GROUND + 20) f.x = clamp(o.x - dir * (def.range ? Math.min(340, def.range) : 130), this.stageL + 40, this.stageR - 40);
+    else if (!def.range && Math.abs(o.x - f.x) > 220) f.x = clamp(o.x - dir * 130, this.stageL + 40, this.stageR - 40);
+    if (!def.range || Math.abs(f.y - o.y) > 220) f.y = o.y;
+    f.grounded = f.y >= GROUND - 2; f.face = o.x >= f.x ? 1 : -1;
     f.act = { name: 'punch', t: 0 }; f.vx = 0; f.vy = 0; f.climbing = false; f.ledge = null; f.qte = null; f.inv = 4; f.ko = false;
     this.phase = 'finisher';
     this.finisher = { owner: f.i, target: o.i, team: winTeam, continueFight, jp: def.jp, title: def.title, style: def.style, color: def.color, t: 0, dur: 2.15, step: 0, ox: o.x, fx: f.x };
@@ -2087,7 +2099,7 @@ export class Game {
     }
     o = { ...o };
     if (def.blocking && o.pierceBlock) {
-      o.dmg *= 0.8;
+      o.dmg *= 0.75;
       this.texts.push({ txt: 'GUARD PIERCE!', x: hx, y: hy - 145, t: 0.7, max: 0.7, color: o.color || '#a7ffeb', size: 28 });
       this.sfx.slash();
     }
@@ -2113,7 +2125,7 @@ export class Game {
         this.texts.push({ txt: `NAIL BURST ×${stacks}!`, x: hx, y: hy - 145, t: 0.75, max: 0.75, color: '#ff6bd6', size: 30 });
       }
     }
-    dmg = Math.min(34, this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg));
+    dmg = Math.min(28, this.adaptHit(def, o.src || (o.basic ? 'basic' : 'skill'), dmg));
     def.lastHitBy = att.i;
     def.hp = Math.max(0, def.hp - dmg); def.vx = dir * o.kb; def.vy = -(o.vy === undefined ? 260 : o.vy); if (o.vy !== 0) def.grounded = false;
     def.stun = Math.max(def.stun, o.stun); def.act = null; def.inv = 0.2; def.flash = 0.12;
@@ -2433,7 +2445,8 @@ export class Game {
       if (f.ko || f.dizzy <= 0) return;
       const att = this.fighters.find((a) => a.team !== f.team && !a.ko && (!this.net || a.i === this.mySlot));
       const key = att ? (this.hints[att.i] || this.hints[0])[6] : this.hints[0][6];
-      const inRange = !!att && Math.abs(att.x - f.x) <= 95 && Math.abs(att.y - f.y) <= 95;
+      const r = att ? this.finisherRange(att) : { rx: 95, ry: 95, isRanged: false };
+      const inRange = !!att && Math.abs(att.x - f.x) <= r.rx && Math.abs(att.y - f.y) <= r.ry;
       const y = f.y - 145;
       c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
       for (let i = 0; i < 3; i++) {
@@ -2443,7 +2456,7 @@ export class Game {
       c.globalAlpha = pulse; c.strokeStyle = inRange ? '#ffd24a' : '#ff5252'; c.lineWidth = 3;
       c.beginPath(); c.moveTo(f.x, y - 16); c.lineTo(f.x + 14, y); c.lineTo(f.x, y + 16); c.lineTo(f.x - 14, y); c.closePath(); c.stroke();
       c.font = `13px ${FONT}`; c.lineWidth = 4; c.strokeStyle = '#000';
-      const msg = inRange ? `⚡ FINISH! [${key}]` : `เข้าใกล้เพื่อปิดฉาก [${key}]`;
+      const msg = inRange ? (r.isRanged ? `⚡ RANGE FINISH! [${key}]` : `⚡ FINISH! [${key}]`) : (r.isRanged ? `เข้าระยะยิง (${r.rx}px) [${key}]` : `เข้าใกล้เพื่อปิดฉาก [${key}]`);
       c.strokeText(msg, f.x, y - 28); c.fillStyle = inRange ? '#ffd24a' : '#ff8a80'; c.fillText(msg, f.x, y - 28);
       c.restore();
     });
