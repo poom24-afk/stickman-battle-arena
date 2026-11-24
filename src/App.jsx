@@ -3,6 +3,7 @@ import Arena from './components/Arena.jsx';
 import Select from './components/Select.jsx';
 import Settings from './components/Settings.jsx';
 import OnlineLobby from './components/OnlineLobby.jsx';
+import Tutorial from './components/Tutorial.jsx';
 import { MenuBgCanvas, OpeningIntro } from './components/MenuScene.jsx';
 import { loadControls, keyLabel } from './game/keys.js';
 import { CHARACTERS } from './game/constants.js';
@@ -289,6 +290,19 @@ export default function App() {
   }
   if (settingsProf) return <Settings initialProfile={settingsProf} onBack={() => { unlockAudio(); sfx.click(); setSettingsProf(null); }} />;
   if (screen === 'settings') return <Settings onBack={() => go('menu')} />;
+  if (screen === 'tutorial') {
+    return (
+      <Tutorial
+        onBack={() => go('menu')}
+        onSettings={() => { unlockAudio(); sfx.click(); setSettingsProf('1v1'); }}
+        onPractice={() => {
+          setCfg((c) => normCfg({ ...c, mode: '1v1', p2Ai: true, aiDiff: 'easy', arena: 1, target: 2 }));
+          setRound((r) => r + 1);
+          go('arena');
+        }}
+      />
+    );
+  }
   if (screen === 'lobby') return <OnlineLobby onCreate={createRoom} onJoin={joinRoom} onBack={() => go('menu')} connecting={connecting} error={netErr} />;
   if (screen === 'select') {
     return (
@@ -357,6 +371,7 @@ export default function App() {
         <button className="btn big" onClick={() => { setCfg((c) => ({ ...c, p2Ai: false })); go('select'); }}>เล่น 2 คน (เครื่องเดียว)</button>
         <button className="btn big" style={{ background: 'var(--gold)', color: '#000' }} onClick={() => { setCfg((c) => ({ ...c, p2Ai: true })); go('select'); }}>🤖 เล่นกับบอท</button>
         <button className="btn big" style={{ background: 'var(--violet)' }} onClick={() => go('lobby')}>เล่นออนไลน์</button>
+        <button className="btn big ghost" onClick={() => go('tutorial')}>📖 สอนเล่น</button>
         <button className="btn big ghost" onClick={() => { unlockAudio(); sfx.click(); setSettingsProf('1v1'); }}>ตั้งปุ่ม</button>
         {!isApp && (
           <button className="btn big app-dl" onClick={installApp}>
