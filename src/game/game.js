@@ -4,6 +4,15 @@ import { sfx as rawSfx } from './audio.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const withAlpha = (col, aHex) => {
+  if (typeof col !== 'string') return '#ffffff' + aHex;
+  if (col.startsWith('#')) {
+    if (col.length === 4) return `#${col[1]}${col[1]}${col[2]}${col[2]}${col[3]}${col[3]}${aHex}`;
+    if (col.length === 7) return col + aHex;
+    if (col.length === 9) return col.slice(0, 7) + aHex;
+  }
+  return col;
+};
 const ACTS = {
   punch: { kind: 'melee', pose: 'punch', dur: 0.34, win: [0.08, 0.21], dmg: 6, kb: 280, stun: 0.26, reach: 68, y: [-120, -45], lunge: 140 },
   kick: { kind: 'melee', pose: 'kick', dur: 0.46, win: [0.14, 0.30], dmg: 9, kb: 540, stun: 0.42, reach: 84, y: [-95, 0], lunge: 180, ragdoll: 0.72 },
@@ -217,9 +226,9 @@ export class Game {
     addEventListener('blur', this.clearKeys); document.addEventListener('visibilitychange', this.onVis);
     this.last = performance.now();
     const tick = (now) => {
+      this.raf = requestAnimationFrame(tick);
       const dt = Math.min(0.033, (now - this.last) / 1000); this.last = now;
       this.update(dt); this.render();
-      this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
   }
@@ -940,7 +949,7 @@ export class Game {
     if (f.climbing) {
       const cl2 = climbs.find((clm) => Math.abs(f.x - clm.x) < 26 && f.y >= clm.y1 - 4 && f.y <= clm.y2 + 12);
       if (!cl2) f.climbing = false;
-      else if (f.y <= cl2.y1 && inp._jump) { f.y = cl2.y1; f.vy = 0; f.grounded = true; f.climbing = false; f.dropT = 0; }
+      else if (f.y <= cl2.y1 && (inp._jump || inp._left || inp._right)) { f.y = cl2.y1; f.vy = 0; f.grounded = true; f.climbing = false; f.dropT = 0; }
       else if (f.y >= GROUND && f.x > this.stageL && f.x < this.stageR) { f.y = GROUND; f.vy = 0; f.grounded = true; f.climbing = false; f.dropT = 0; }
       else if (f.y >= cl2.y2) { f.y = cl2.y2; f.vy = 0; f.dropT = 0; }
       return;
@@ -2315,8 +2324,8 @@ export class Game {
       const fade = clamp(dc.t / dc.max, 0, 1);
       c.save(); c.globalAlpha = fade * 0.72;
       if (dc.kind === 'scorch') {
-        const g = c.createRadialGradient(dc.x, dc.y + 3, 4, dc.x, dc.y + 3, dc.r);
-        g.addColorStop(0, dc.color + 'aa'); g.addColorStop(0.45, '#08050acc'); g.addColorStop(1, '#08050a00');
+        const g = c.createRadialGradient(dc.x, dc.y + 3, 4, dc.x, dc.y + 3, Math.max(8, dc.r));
+        g.addColorStop(0, withAlpha(dc.color, 'aa')); g.addColorStop(0.45, '#08050acc'); g.addColorStop(1, '#08050a00');
         c.fillStyle = g; c.beginPath(); c.ellipse(dc.x, dc.y + 3, dc.r, dc.r * 0.24, 0, 0, 7); c.fill();
       } else {
         c.strokeStyle = '#09060e'; c.lineWidth = 3.5; c.lineCap = 'round';
@@ -2375,7 +2384,7 @@ export class Game {
     });
     this.pillars.forEach((p) => {
       const k = p.t / p.max, baseY = p.y ?? GROUND, w = (p.w || 60) * Math.sin((1 - k) * Math.PI * 0.9 + 0.2), g = c.createLinearGradient(0, baseY, 0, baseY - 460);
-      g.addColorStop(0, '#fff'); g.addColorStop(0.3, p.color); g.addColorStop(1, p.color + '00'); c.fillStyle = g; c.fillRect(p.x - w, baseY - 460, w * 2, 460);
+      g.addColorStop(0, '#fff'); g.addColorStop(0.3, p.color); g.addColorStop(1, withAlpha(p.color, '00')); c.fillStyle = g; c.fillRect(p.x - w, baseY - 460, w * 2, 460);
     });
     this.zaps.forEach((z) => {
       c.strokeStyle = z.color; c.lineWidth = 3; c.shadowColor = z.color; c.shadowBlur = 14;
@@ -2532,12 +2541,16 @@ export class Game {
     }
     c.restore();
   }
-  drawOrb(x, y, r, col) { const c = this.c, g = c.createRadialGradient(x, y, 1, x, y, r); g.addColorStop(0, '#fff'); g.addColorStop(0.35, col); g.addColorStop(1, col + '00'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
+  drawOrb(x, y, r, col) {
+    const c = this.c, rr = Math.max(1.5, r || 1.5), g = c.createRadialGradient(x, y, 0.5, x, y, rr);
+    g.addColorStop(0, '#fff'); g.addColorStop(0.35, col); g.addColorStop(1, withAlpha(col, '00'));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, rr, 0, 7); c.fill();
+  }
   drawBeam(b) {
     const c = this.c, k = b.t / b.max, th = b.th * (0.2 + 0.8 * k), x2 = b.d > 0 ? this.worldW + 160 : -160;
     const xMin = Math.min(b.x, x2), len = Math.abs(x2 - b.x);
     const g = c.createLinearGradient(0, b.y - th / 2, 0, b.y + th / 2);
-    g.addColorStop(0, b.color + '00'); g.addColorStop(0.3, b.color); g.addColorStop(0.5, '#ffffff'); g.addColorStop(0.7, b.color); g.addColorStop(1, b.color + '00');
+    g.addColorStop(0, withAlpha(b.color, '00')); g.addColorStop(0.3, b.color); g.addColorStop(0.5, '#ffffff'); g.addColorStop(0.7, b.color); g.addColorStop(1, withAlpha(b.color, '00'));
     c.save(); c.shadowColor = b.color; c.shadowBlur = 40; c.fillStyle = g; c.fillRect(xMin, b.y - th / 2, len, th);
     if (b.style === 'purple') {
       c.lineWidth = 4;
@@ -2640,7 +2653,7 @@ export class Game {
       c.save(); c.translate(p.x, p.y); c.scale(sg, 1); c.fillStyle = '#1a0e2e'; c.strokeStyle = p.color; c.lineWidth = 2;
       c.beginPath(); c.arc(0, 0, 13, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#ffeb3b'; c.fillRect(3, -4, 4, 4); c.restore(); return;
     }
-    const g = c.createLinearGradient(p.x, 0, p.x - sg * 120, 0); g.addColorStop(0, p.color); g.addColorStop(1, p.color + '00');
+    const g = c.createLinearGradient(p.x, 0, p.x - sg * 120, 0); g.addColorStop(0, p.color); g.addColorStop(1, withAlpha(p.color, '00'));
     c.fillStyle = g; c.fillRect(Math.min(p.x, p.x - sg * 120), p.y - p.r * 0.5, 120, p.r); this.drawOrb(p.x, p.y, p.r * 1.5, p.color);
     if (p.style === 'red') { c.save(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.ellipse(p.x, p.y, p.r * 1.1, p.r * 0.45, this.time * 12, 0, 7); c.stroke(); c.restore(); }
   }
@@ -2845,7 +2858,7 @@ export class Game {
         c.strokeStyle = this.arena.edge; c.lineWidth = 2.5;
         for (let y = cl.y1 + 14; y < cl.y2 - 4; y += 22) { c.beginPath(); c.moveTo(cl.x - 10, y); c.lineTo(cl.x + 10, y); c.stroke(); }
       } else {
-        c.strokeStyle = this.arena.edge || '#ffd24a'; c.shadowColor = this.arena.edge || '#ffd24a'; c.shadowBlur = 10; c.lineWidth = 3;
+        c.strokeStyle = this.arena.edge || '#ffd24a'; c.lineWidth = 3;
         for (let y = cl.y1 + 8; y < cl.y2; y += 18) { c.beginPath(); c.ellipse(cl.x, y, 5, 9, 0, 0, 7); c.stroke(); }
       }
       c.restore();
@@ -2888,7 +2901,7 @@ export class Game {
     if (A.stars) { c.fillStyle = '#fff'; D.st.forEach((s) => { c.globalAlpha = 0.28 + 0.72 * Math.abs(Math.sin(t * 1.3 + s.x)); c.fillRect(s.x, s.y, s.s, s.s); }); c.globalAlpha = 1; }
     const cxOff = (ww - W) / 2;
     (A.orbs || []).forEach((o) => {
-      this.drawOrb(o.x + cxOff, o.y, o.r * 1.35, o.c + '66');
+      this.drawOrb(o.x + cxOff, o.y, o.r * 1.35, withAlpha(o.c, '66'));
       this.drawOrb(o.x + cxOff, o.y, o.r, o.c);
     });
     if (A.extra === 'aurora') ['#00ffa6', '#7c4dff', '#00e5ff'].forEach((col, k) => {
@@ -2929,7 +2942,7 @@ export class Game {
     this.drawExtra(A.extra, t);
     /* Horizon atmospheric glow blending backdrop softly behind fighters */
     const hg = c.createLinearGradient(0, GROUND - 140, 0, GROUND);
-    hg.addColorStop(0, '#00000000'); hg.addColorStop(1, A.edge + '22');
+    hg.addColorStop(0, '#00000000'); hg.addColorStop(1, withAlpha(A.edge, '22'));
     c.fillStyle = hg; c.fillRect(-1000, GROUND - 140, ww + 2000, 140);
     if (A.parts) D.e.forEach((e, idx) => {
       const pt = A.parts.t, rise = pt === 'ember' || pt === 'bubble' || pt === 'firefly';
@@ -2940,7 +2953,10 @@ export class Game {
       c.fillStyle = A.parts.c; c.strokeStyle = A.parts.c;
       if (pt === 'data') c.fillRect(x, y, 2, e.s * 5);
       else if (pt === 'rain') { c.lineWidth = 1.6; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 6, y + 18); c.stroke(); }
-      else if (pt === 'firefly') { c.shadowColor = A.parts.c; c.shadowBlur = 10; c.beginPath(); c.arc(x, y, e.s * 0.95, 0, 7); c.fill(); }
+      else if (pt === 'firefly') {
+        c.beginPath(); c.arc(x, y, e.s * 2.2, 0, 7); c.globalAlpha *= 0.28; c.fill();
+        c.globalAlpha = 0.9; c.beginPath(); c.arc(x, y, e.s * 0.95, 0, 7); c.fill();
+      }
       else if (pt === 'bubble') { c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, e.s * 1.4, 0, 7); c.stroke(); }
       else if (pt === 'petal' || pt === 'feather') { c.beginPath(); c.ellipse(x, y, e.s * (pt === 'feather' ? 2.4 : 1.6), e.s * 0.85, t + e.x, 0, 7); c.fill(); }
       else c.fillRect(x, y, e.s, e.s);

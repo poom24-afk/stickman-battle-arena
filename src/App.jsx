@@ -69,6 +69,31 @@ export default function App() {
   const [netErr, setNetErr] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [installEvt, setInstallEvt] = useState(null);
+  const [isApp, setIsApp] = useState(() => window.matchMedia?.('(display-mode: standalone)')?.matches || !!window.navigator.standalone);
+  const [installHelp, setInstallHelp] = useState(false);
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setInstallEvt(e); };
+    const onInstalled = () => { setInstallEvt(null); setIsApp(true); setInstallHelp(false); };
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const installApp = async () => {
+    unlockAudio(); sfx.click();
+    if (installEvt) {
+      installEvt.prompt();
+      const res = await installEvt.userChoice.catch(() => null);
+      if (res?.outcome === 'accepted') setInstallEvt(null);
+    } else {
+      setInstallHelp(true);
+    }
+  };
 
   const ensureNet = () => {
     if (!netRef.current) netRef.current = new NetClient();
@@ -333,7 +358,34 @@ export default function App() {
         <button className="btn big" style={{ background: 'var(--gold)', color: '#000' }} onClick={() => { setCfg((c) => ({ ...c, p2Ai: true })); go('select'); }}>🤖 เล่นกับบอท</button>
         <button className="btn big" style={{ background: 'var(--violet)' }} onClick={() => go('lobby')}>เล่นออนไลน์</button>
         <button className="btn big ghost" onClick={() => { unlockAudio(); sfx.click(); setSettingsProf('1v1'); }}>ตั้งปุ่ม</button>
+        {!isApp && (
+          <button className="btn big app-dl" onClick={installApp}>
+            ⬇ โหลดเป็นแอพลงคอม
+          </button>
+        )}
       </div>
+      {isApp && <p className="pill ok" style={{ marginTop: 4 }}>✓ กำลังเล่นในโหมดแอพ (PC Standalone)</p>}
+      {installHelp && (
+        <div className="overlay" onClick={() => setInstallHelp(false)}>
+          <div className="panel cut install-modal" style={{ '--c': 'var(--blue)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: 'var(--blue)' }}>⬇ ติดตั้งเกมเป็นแอพลงคอม (Windows / Mac)</h3>
+            <p className="trait" style={{ marginTop: 8 }}>
+              สามารถติดตั้งเป็นแอพแยกหน้าต่าง มีไอคอนบน Desktop / Start Menu และเปิดเล่นแบบออฟไลน์ได้ทันที:
+            </p>
+            <ol className="install-steps">
+              <li>เปิดเว็บด้วย <b>Google Chrome</b> หรือ <b>Microsoft Edge</b></li>
+              <li>กดไอคอน <b>ติดตั้ง (⊕ / 💻)</b> ที่มุมขวาของช่องพิมพ์เว็บ (URL Bar)</li>
+              <li>หรือกดเมนูมุมขวาบน <b>⋮ → บันทึกและแชร์ (Save and share) → ติดตั้งหน้าเว็บเป็นแอป (Install page as app...)</b></li>
+            </ol>
+            <p className="hint" style={{ marginTop: 10 }}>
+              * หากเปิดผ่านลิงก์ HTTPS (GitHub Pages) ปุ่มนี้จะเด้งหน้าต่างติดตั้งให้อัตโนมัติในคลิกเดียว
+            </p>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn" onClick={() => setInstallHelp(false)}>เข้าใจแล้ว</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="controls menu-controls">
         <div><h4>PLAYER 1</h4><p><Lines c={c1} /></p></div>
         <div><h4>PLAYER 2</h4><p><Lines c={c2} />(เล่นออนไลน์ใช้ปุ่ม P1 ได้เลย)</p></div>

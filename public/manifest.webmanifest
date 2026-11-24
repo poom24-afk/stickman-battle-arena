@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "Stickman Battle: Local Arena",
+  "short_name": "Stickman Arena",
+  "description": "เกมต่อสู้ Stickman สไตล์อนิเมะ 18 ตัวละคร 14 สนาม รองรับ 1v1 / 2v2 คีย์บอร์ดเสริม และโหมดออนไลน์",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#07040e",
+  "theme_color": "#07040e",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
